@@ -9,13 +9,11 @@ from starlette.responses import FileResponse
 from api import routes_brand, routes_credentials, routes_orchestrator, routes_posts
 from api.auth import router as auth_router
 from db.session import init_db
-from review.webhook import router as webhook_router
 
 app = FastAPI(title="Instagram Automation")
 
 init_db()
 
-app.include_router(webhook_router)
 app.include_router(auth_router)
 app.include_router(routes_brand.router)
 app.include_router(routes_posts.router)

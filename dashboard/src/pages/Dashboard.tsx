@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import { Film, MessageCircle, Cloud, Camera, Sparkles, Zap, PlayCircle } from "lucide-react"
+import { Film, Cloud, Camera, Sparkles, Zap, PlayCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/client"
@@ -11,7 +11,6 @@ const GROUP_META: Record<string, { label: string; icon: typeof Sparkles }> = {
   llm: { label: "Content strategy", icon: Sparkles },
   video: { label: "Video engine", icon: Film },
   instagram: { label: "Instagram", icon: Camera },
-  whatsapp: { label: "WhatsApp", icon: MessageCircle },
   storage: { label: "Storage", icon: Cloud },
 }
 
@@ -76,7 +75,7 @@ export function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Object.entries(GROUP_META).map(([key, meta], i) => {
           const fields = groups?.[key] ?? []
           const configured = isGroupConfigured(key, fields)

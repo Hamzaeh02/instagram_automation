@@ -15,7 +15,6 @@ class PostStatus(str, enum.Enum):
     PLANNED = "planned"
     VIDEO_GENERATING = "video_generating"
     PENDING_REVIEW = "pending_review"
-    REJECTED_PENDING_REASON = "rejected_pending_reason"
     APPROVED = "approved"
     NEEDS_MANUAL_EDIT = "needs_manual_edit"
     PUBLISHING = "publishing"
@@ -47,8 +46,6 @@ class Post(Base):
     heygen_video_id: Mapped[str] = mapped_column(String(200), default="")
     video_local_path: Mapped[str] = mapped_column(String(500), default="")
     video_url: Mapped[str] = mapped_column(String(1000), default="")
-
-    whatsapp_message_id: Mapped[str] = mapped_column(String(200), default="")
 
     ig_creation_id: Mapped[str] = mapped_column(String(200), default="")
     ig_media_id: Mapped[str] = mapped_column(String(200), default="")

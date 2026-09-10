@@ -92,11 +92,6 @@ class Settings:
     instagram_access_token: str = _env_str("INSTAGRAM_ACCESS_TOKEN")
     instagram_graph_api_version: str = _env_str("INSTAGRAM_GRAPH_API_VERSION", "v25.0")
 
-    whatsapp_phone_number_id: str = _env_str("WHATSAPP_PHONE_NUMBER_ID")
-    whatsapp_access_token: str = _env_str("WHATSAPP_ACCESS_TOKEN")
-    whatsapp_verify_token: str = _env_str("WHATSAPP_VERIFY_TOKEN")
-    my_whatsapp_number: str = _env_str("MY_WHATSAPP_NUMBER")
-
     storage_endpoint_url: str = _env_str("STORAGE_ENDPOINT_URL")
     storage_bucket: str = _env_str("STORAGE_BUCKET")
     storage_access_key_id: str = _env_str("STORAGE_ACCESS_KEY_ID")

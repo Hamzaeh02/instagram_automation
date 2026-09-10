@@ -150,15 +150,6 @@ export function Settings() {
                 onSaved={loadCredentials}
               />
             </FadeIn>
-            <FadeIn delay={0.08}>
-              <CredentialGroup
-                title="WhatsApp"
-                description="Sends content to you for review and approval."
-                fields={groups.whatsapp}
-                testKey="whatsapp"
-                onSaved={loadCredentials}
-              />
-            </FadeIn>
             <FadeIn delay={0.1}>
               <CredentialGroup
                 title="Storage"

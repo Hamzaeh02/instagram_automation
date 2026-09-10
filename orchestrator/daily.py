@@ -10,7 +10,6 @@ from common.logging import get_logger
 from db.models import Post, PostStatus, RunLog
 from db.session import get_session, init_db
 from publish.instagram import InstagramPublishError, InstagramPublisher
-from review.whatsapp import WhatsAppClient, send_post_for_review
 from storage.upload import upload_video
 from strategy.generate_calendar import generate_calendar
 from video.generate import generate_video_for_post
@@ -65,15 +64,11 @@ def generate_pending_videos(session, brand) -> None:
             final_path = generate_video_for_post(post, VIDEO_DIR, brand)
             post.video_local_path = final_path
             post.video_url = upload_video(final_path, key=f"post_{post.id}.mp4")
-            session.commit()
-
-            message_id = send_post_for_review(post, final_path)
-            post.whatsapp_message_id = message_id
             post.status = PostStatus.PENDING_REVIEW.value
             session.commit()
-            logger.info("Post %s sent for WhatsApp review", post.id)
+            logger.info("Post %s generated and ready for review", post.id)
         except Exception as exc:
-            logger.exception("Video generation/review-send failed for post %s", post.id)
+            logger.exception("Video generation failed for post %s", post.id)
             post.status = PostStatus.FAILED.value
             post.error_message = str(exc)
             session.commit()
@@ -91,7 +86,6 @@ def publish_due_posts(session) -> None:
         return
 
     publisher = InstagramPublisher()
-    wa = WhatsAppClient()
 
     for post in due_posts:
         post.status = PostStatus.PUBLISHING.value
@@ -104,14 +98,12 @@ def publish_due_posts(session) -> None:
             post.ig_permalink = permalink
             post.status = PostStatus.POSTED.value
             session.commit()
-            wa.send_text(f"Posted: \"{post.title}\"\n{permalink}")
             logger.info("Post %s published: %s", post.id, permalink)
         except InstagramPublishError as exc:
             logger.exception("Publishing failed for post %s", post.id)
             post.status = PostStatus.FAILED.value
             post.error_message = str(exc)
             session.commit()
-            wa.send_text(f"Failed to publish \"{post.title}\": {exc}")
 
 
 def run_once() -> None:

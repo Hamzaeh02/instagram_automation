@@ -39,10 +39,6 @@ FIELDS: list[FieldSpec] = [
     FieldSpec("meta_app_secret", "META_APP_SECRET", "Meta App secret", "instagram", secret=True),
     FieldSpec("ig_business_account_id", "IG_BUSINESS_ACCOUNT_ID", "Instagram User ID", "instagram"),
     FieldSpec("instagram_access_token", "INSTAGRAM_ACCESS_TOKEN", "Instagram access token", "instagram", secret=True),
-    FieldSpec("whatsapp_phone_number_id", "WHATSAPP_PHONE_NUMBER_ID", "WhatsApp phone number ID", "whatsapp"),
-    FieldSpec("whatsapp_access_token", "WHATSAPP_ACCESS_TOKEN", "WhatsApp access token", "whatsapp", secret=True),
-    FieldSpec("whatsapp_verify_token", "WHATSAPP_VERIFY_TOKEN", "WhatsApp webhook verify token", "whatsapp", secret=True),
-    FieldSpec("my_whatsapp_number", "MY_WHATSAPP_NUMBER", "Your WhatsApp number", "whatsapp"),
     FieldSpec("storage_bucket", "STORAGE_BUCKET", "Bucket name", "storage"),
     FieldSpec("storage_endpoint_url", "STORAGE_ENDPOINT_URL", "Endpoint URL (blank for AWS S3)", "storage"),
     FieldSpec("storage_access_key_id", "STORAGE_ACCESS_KEY_ID", "Access key ID", "storage", secret=True),
@@ -128,12 +124,6 @@ def test_integration(integration: str):
 
             info = InstagramPublisher().whoami()
             return TestResult(ok=True, message=f"Connected as @{info.get('username')}")
-
-        if integration == "whatsapp":
-            from review.whatsapp import WhatsAppClient
-
-            info = WhatsAppClient().check_connection()
-            return TestResult(ok=True, message=f"Number: {info.get('display_phone_number')}")
 
         if integration == "storage":
             from storage.upload import check_connection

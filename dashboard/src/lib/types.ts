@@ -2,7 +2,6 @@ export type PostStatus =
   | "planned"
   | "video_generating"
   | "pending_review"
-  | "rejected_pending_reason"
   | "approved"
   | "needs_manual_edit"
   | "publishing"
@@ -71,7 +70,6 @@ export const STATUS_LABEL: Record<PostStatus, string> = {
   planned: "Planned",
   video_generating: "Generating video",
   pending_review: "Pending review",
-  rejected_pending_reason: "Awaiting reason",
   approved: "Approved",
   needs_manual_edit: "Needs manual edit",
   publishing: "Publishing",
@@ -83,7 +81,6 @@ export const STATUS_COLOR: Record<PostStatus, string> = {
   planned: "slate",
   video_generating: "amber",
   pending_review: "info",
-  rejected_pending_reason: "amber",
   approved: "success",
   needs_manual_edit: "danger",
   publishing: "info",

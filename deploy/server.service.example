@@ -1,5 +1,5 @@
 [Unit]
-Description=Instagram Automation - App Server (webhook + dashboard API + dashboard)
+Description=Instagram Automation - App Server (dashboard API + dashboard)
 After=network.target
 
 [Service]
