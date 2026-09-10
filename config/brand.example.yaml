@@ -1,0 +1,41 @@
+# Copy this file to brand.yaml and fill in your niche. This is the only file
+# you need to edit to point the whole pipeline at a new account/brand.
+
+brand_name: "Your Brand Name"
+niche: "Describe the topic/industry in a sentence or two"
+audience: "Who the content is for, e.g. age range, interests, pain points"
+tone: "e.g. energetic and funny / calm and authoritative / warm and relatable"
+
+# Recurring themes the 90-day calendar should rotate through.
+content_pillars:
+  - "Pillar 1 (e.g. educational tips)"
+  - "Pillar 2 (e.g. behind the scenes)"
+  - "Pillar 3 (e.g. trends/commentary)"
+  - "Pillar 4 (e.g. customer stories / social proof)"
+
+# Topics the strategy engine must never generate content about.
+banned_topics:
+  - "politics"
+  - "competitor names"
+
+# How many posts per week to plan (spread evenly across the week).
+posting_cadence_per_week: 3
+
+# Call-to-action style to weave into captions (e.g. "drive comments", "drive saves", "drive link in bio clicks").
+cta_style: "encourage comments and shares"
+
+# Hashtag guidance (mix of broad/niche/branded, how many, any always-include tags).
+hashtag_style: "8-12 tags: 2 broad, 5-7 niche, 1-2 branded. Always include #YourBrand."
+
+# Voice for the free broll engine (edge-tts). See available voices with:
+# `edge-tts --list-voices` after installing requirements. Examples:
+# en-US-GuyNeural, en-US-JennyNeural, en-GB-RyanNeural.
+tts_voice: "en-US-GuyNeural"
+
+# HeyGen avatar + voice to use for every generated video (only used if
+# VIDEO_ENGINE=heygen in .env).
+heygen_avatar_id: ""
+heygen_voice_id: ""
+
+# IANA timezone used for scheduling posts and the daily cron run.
+timezone: "UTC"

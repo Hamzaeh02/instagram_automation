@@ -1,0 +1,15 @@
+[Unit]
+Description=Instagram Automation - App Server (webhook + dashboard API + dashboard)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/instagram-automation
+EnvironmentFile=/opt/instagram-automation/.env
+ExecStart=/opt/instagram-automation/.venv/bin/python scripts/run_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+.env
+config/brand.yaml
+data/
+*.db
+__pycache__/
+*.pyc
+.venv/
+venv/
+tmp/
+*.mp4

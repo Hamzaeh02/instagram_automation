@@ -1,0 +1,3 @@
+# Run the daily orchestrator once a day at 06:00 server time.
+# Edit the path, then install with: crontab deploy/crontab.example
+0 6 * * * cd /opt/instagram-automation && /opt/instagram-automation/.venv/bin/python cli.py run-once >> /opt/instagram-automation/data/orchestrator.log 2>&1
