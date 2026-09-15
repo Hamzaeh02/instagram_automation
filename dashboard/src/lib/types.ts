@@ -1,6 +1,7 @@
 export type PostStatus =
   | "planned"
   | "video_generating"
+  | "image_generating"
   | "pending_review"
   | "approved"
   | "needs_manual_edit"
@@ -8,9 +9,13 @@ export type PostStatus =
   | "posted"
   | "failed"
 
+export type PostSource = "ai_generated" | "user_uploaded"
+
 export interface Post {
   id: number
-  scheduled_date: string
+  source: PostSource
+  media_type: "REELS" | "IMAGE"
+  scheduled_at: string
   pillar: string
   hook: string
   video_concept: string
@@ -45,17 +50,9 @@ export interface BrandProfile {
   heygen_avatar_id: string
   heygen_voice_id: string
   timezone: string
+  content_brief?: string
+  content_type?: "video" | "post"
 }
-
-export interface CredentialField {
-  name: string
-  label: string
-  secret: boolean
-  configured: boolean
-  value: string
-}
-
-export type CredentialGroups = Record<string, CredentialField[]>
 
 export interface RunLogEntry {
   id: number
@@ -69,6 +66,7 @@ export interface RunLogEntry {
 export const STATUS_LABEL: Record<PostStatus, string> = {
   planned: "Planned",
   video_generating: "Generating video",
+  image_generating: "Finding photo",
   pending_review: "Pending review",
   approved: "Approved",
   needs_manual_edit: "Needs manual edit",
@@ -80,6 +78,7 @@ export const STATUS_LABEL: Record<PostStatus, string> = {
 export const STATUS_COLOR: Record<PostStatus, string> = {
   planned: "slate",
   video_generating: "amber",
+  image_generating: "amber",
   pending_review: "info",
   approved: "success",
   needs_manual_edit: "danger",

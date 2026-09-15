@@ -1,11 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowLeft, Check, ExternalLink, Save, X } from "lucide-react"
+import { ArrowLeft, Check, ExternalLink, Save, Sparkles, Trash2, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { api } from "../api/client"
 import { Button, Card, FadeIn, Label, Spinner, Textarea, Input } from "../components/ui"
 import { StatusBadge } from "../components/StatusBadge"
 import type { Post } from "../lib/types"
+
+function toDatetimeLocal(iso: string) {
+  const d = new Date(iso)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
 
 export function PostDetail() {
   const { id } = useParams()
@@ -21,12 +27,23 @@ export function PostDetail() {
     const res = await api.get<Post>(`/posts/${id}`)
     setPost(res)
     setDirty(false)
+    return res
   }
 
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // While a post is still being written/generated (e.g. just triggered from
+  // "Create with AI"), poll for progress instead of leaving the page frozen
+  // on a stale "generating" state - stops itself once it leaves that phase.
+  useEffect(() => {
+    if (!post || !["planned", "video_generating", "image_generating"].includes(post.status)) return
+    const interval = setInterval(load, 4000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.status])
 
   function update<K extends keyof Post>(key: K, value: Post[K]) {
     setPost((p) => (p ? { ...p, [key]: value } : p))
@@ -44,6 +61,7 @@ export function PostDetail() {
         script: post.script,
         on_screen_text: post.on_screen_text,
         broll_keywords: post.broll_keywords,
+        scheduled_at: post.scheduled_at,
       })
       setDirty(false)
     } finally {
@@ -75,6 +93,18 @@ export function PostDetail() {
     }
   }
 
+  async function remove() {
+    if (!post) return
+    if (!confirm(`Delete "${post.title || "this post"}"? This can't be undone.`)) return
+    setBusy(true)
+    try {
+      await api.delete(`/posts/${post.id}`)
+      navigate(post.source === "user_uploaded" ? "/upload" : "/calendar")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!post) {
     return (
       <div className="flex justify-center py-20">
@@ -99,7 +129,11 @@ export function PostDetail() {
             <StatusBadge status={post.status} />
           </div>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {post.scheduled_date} · {post.pillar}
+            {new Date(post.scheduled_at).toLocaleString(undefined, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}{" "}
+            · {post.pillar}
           </p>
         </div>
 
@@ -136,11 +170,15 @@ export function PostDetail() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <FadeIn className="lg:col-span-2">
           <Card className="overflow-hidden p-0">
-            {post.has_video ? (
+            {post.has_video && post.media_type === "IMAGE" ? (
+              <img className="aspect-[9/16] w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
+            ) : post.has_video ? (
               <video controls className="aspect-[9/16] w-full bg-black" src={`/api/posts/${post.id}/video`} />
+            ) : post.status === "planned" || post.status === "video_generating" || post.status === "image_generating" ? (
+              <GeneratingPanel status={post.status} />
             ) : (
               <div className="flex aspect-[9/16] w-full items-center justify-center text-sm text-[var(--color-text-faint)]">
-                No video generated yet
+                No video for this post
               </div>
             )}
           </Card>
@@ -153,6 +191,15 @@ export function PostDetail() {
           </Card>
 
           <Card>
+            <Label>Posting date & time</Label>
+            <Input
+              type="datetime-local"
+              value={toDatetimeLocal(post.scheduled_at)}
+              onChange={(e) => update("scheduled_at", e.target.value)}
+            />
+          </Card>
+
+          <Card>
             <Label>Caption</Label>
             <Textarea rows={4} value={post.caption} onChange={(e) => update("caption", e.target.value)} />
           </Card>
@@ -162,15 +209,29 @@ export function PostDetail() {
             <Textarea rows={2} value={post.hashtags} onChange={(e) => update("hashtags", e.target.value)} />
           </Card>
 
-          <Card>
-            <Label>Voiceover script</Label>
-            <Textarea rows={5} value={post.script} onChange={(e) => update("script", e.target.value)} />
-          </Card>
+          {post.source === "ai_generated" && post.media_type === "REELS" && (
+            <>
+              <Card>
+                <Label>Voiceover script</Label>
+                <Textarea rows={5} value={post.script} onChange={(e) => update("script", e.target.value)} />
+              </Card>
 
-          <Card>
-            <Label>B-roll keywords</Label>
-            <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
-          </Card>
+              <Card>
+                <Label>B-roll keywords</Label>
+                <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
+              </Card>
+            </>
+          )}
+
+          {post.source === "ai_generated" && post.media_type === "IMAGE" && (
+            <Card>
+              <Label>Stock photo keywords</Label>
+              <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
+              <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+                What the stock photo was searched for.
+              </p>
+            </Card>
+          )}
 
           <div className="flex flex-wrap items-center gap-3">
             {dirty && (
@@ -188,6 +249,12 @@ export function PostDetail() {
                   <X className="h-4 w-4" /> Reject
                 </Button>
               </>
+            )}
+
+            {post.status !== "posted" && post.status !== "publishing" && (
+              <Button variant="danger" onClick={remove} disabled={busy} className="ml-auto">
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
             )}
           </div>
         </FadeIn>
@@ -233,6 +300,42 @@ export function PostDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+function GeneratingPanel({ status }: { status: "planned" | "video_generating" | "image_generating" }) {
+  const label =
+    status === "video_generating"
+      ? "Generating your video…"
+      : status === "image_generating"
+        ? "Finding a matching photo…"
+        : "Queued — starting shortly…"
+  const detail =
+    status === "image_generating"
+      ? "Searching stock photos for a match — usually just a few seconds."
+      : "Voiceover, footage, and captions are being put together — usually a minute or two."
+  return (
+    <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-5 p-8 text-center">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+        className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-lg shadow-violet-900/40"
+      >
+        <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
+      </motion.div>
+      <div>
+        <p className="text-sm font-medium text-[var(--color-text)]">{label}</p>
+        <p className="mt-1 text-xs text-[var(--color-text-faint)]">{detail}</p>
+      </div>
+      <div className="h-1.5 w-40 overflow-hidden rounded-full bg-white/8">
+        <motion.div
+          className="h-full w-1/3 rounded-full bg-gradient-to-r from-[var(--color-accent-from)] to-[var(--color-accent-to)]"
+          animate={{ x: ["-100%", "220%"] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
+      <p className="text-[11px] text-[var(--color-text-faint)]">This page updates automatically — no need to refresh.</p>
     </div>
   )
 }

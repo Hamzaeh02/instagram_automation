@@ -6,7 +6,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from api import routes_brand, routes_credentials, routes_orchestrator, routes_posts
+from api import (
+    routes_ai,
+    routes_brand,
+    routes_create,
+    routes_instagram,
+    routes_orchestrator,
+    routes_posts,
+    routes_uploads,
+)
 from api.auth import router as auth_router
 from db.session import init_db
 
@@ -18,7 +26,10 @@ app.include_router(auth_router)
 app.include_router(routes_brand.router)
 app.include_router(routes_posts.router)
 app.include_router(routes_orchestrator.router)
-app.include_router(routes_credentials.router)
+app.include_router(routes_instagram.router)
+app.include_router(routes_ai.router)
+app.include_router(routes_uploads.router)
+app.include_router(routes_create.router)
 
 DIST_DIR = Path(__file__).resolve().parent.parent / "dashboard" / "dist"
 

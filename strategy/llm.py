@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import json
+import re
+
 from common.config import settings
 from common.logging import get_logger
 
 logger = get_logger(__name__)
 
 MAX_TOKENS = 4096
+
+
+def extract_json_object(text: str) -> dict:
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        raise ValueError(f"No JSON object found in model response:\n{text[:500]}")
+    return json.loads(match.group(0))
 
 
 def _call_anthropic(prompt: str) -> str:

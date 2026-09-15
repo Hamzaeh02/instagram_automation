@@ -3,9 +3,14 @@ import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { api, ApiError } from "../api/client"
-import { Button, Input, Label, Textarea } from "../components/ui"
+import { Button, FieldLabelRow, Input, Label, Textarea } from "../components/ui"
 import { TagList } from "../components/TagList"
+import { AiImproveButton } from "../components/AiImproveButton"
 import type { BrandProfile } from "../lib/types"
+
+function brandContext(form: BrandProfile): Record<string, string> {
+  return { brand_name: form.brand_name, niche: form.niche, audience: form.audience, tone: form.tone }
+}
 
 const VOICES = [
   { id: "en-US-GuyNeural", label: "Guy — US, confident male" },
@@ -175,7 +180,17 @@ function StepBrand({ form, update }: StepProps) {
     <div className="space-y-5">
       <h2 className="font-[var(--font-display)] text-lg font-bold">What's your brand?</h2>
       <div>
-        <Label>Brand name</Label>
+        <FieldLabelRow
+          label="Brand name"
+          action={
+            <AiImproveButton
+              field="brand_name"
+              text={form.brand_name}
+              context={brandContext(form)}
+              onImproved={(v) => update("brand_name", v)}
+            />
+          }
+        />
         <Input
           autoFocus
           placeholder="e.g. Canvas Digital"
@@ -184,7 +199,17 @@ function StepBrand({ form, update }: StepProps) {
         />
       </div>
       <div>
-        <Label>Niche / topic</Label>
+        <FieldLabelRow
+          label="Niche / topic"
+          action={
+            <AiImproveButton
+              field="niche"
+              text={form.niche}
+              context={brandContext(form)}
+              onImproved={(v) => update("niche", v)}
+            />
+          }
+        />
         <Textarea
           rows={3}
           placeholder="Describe what this account is about in a sentence or two — e.g. sustainable home products for eco-conscious millennials"
@@ -201,7 +226,17 @@ function StepAudience({ form, update }: StepProps) {
     <div className="space-y-5">
       <h2 className="font-[var(--font-display)] text-lg font-bold">Who are you talking to?</h2>
       <div>
-        <Label>Target audience</Label>
+        <FieldLabelRow
+          label="Target audience"
+          action={
+            <AiImproveButton
+              field="audience"
+              text={form.audience}
+              context={brandContext(form)}
+              onImproved={(v) => update("audience", v)}
+            />
+          }
+        />
         <Textarea
           rows={3}
           placeholder="Age range, interests, pain points — e.g. busy professionals aged 25-40 who care about sustainability but don't have time to research it"
@@ -210,7 +245,17 @@ function StepAudience({ form, update }: StepProps) {
         />
       </div>
       <div>
-        <Label>Brand voice / tone</Label>
+        <FieldLabelRow
+          label="Brand voice / tone"
+          action={
+            <AiImproveButton
+              field="tone"
+              text={form.tone}
+              context={brandContext(form)}
+              onImproved={(v) => update("tone", v)}
+            />
+          }
+        />
         <Input
           placeholder="e.g. energetic and funny, or calm and authoritative"
           value={form.tone}
@@ -271,7 +316,17 @@ function StepCadence({ form, update }: StepProps) {
         </div>
       </div>
       <div>
-        <Label>Call-to-action style</Label>
+        <FieldLabelRow
+          label="Call-to-action style"
+          action={
+            <AiImproveButton
+              field="cta_style"
+              text={form.cta_style}
+              context={brandContext(form)}
+              onImproved={(v) => update("cta_style", v)}
+            />
+          }
+        />
         <Input
           placeholder="e.g. encourage comments and shares"
           value={form.cta_style}
@@ -279,7 +334,17 @@ function StepCadence({ form, update }: StepProps) {
         />
       </div>
       <div>
-        <Label>Hashtag style</Label>
+        <FieldLabelRow
+          label="Hashtag style"
+          action={
+            <AiImproveButton
+              field="hashtag_style"
+              text={form.hashtag_style}
+              context={brandContext(form)}
+              onImproved={(v) => update("hashtag_style", v)}
+            />
+          }
+        />
         <Input
           placeholder="e.g. 8-12 tags: 2 broad, 5-7 niche, 1-2 branded"
           value={form.hashtag_style}

@@ -1,29 +1,38 @@
-import { Save } from "lucide-react"
+import { Camera, CheckCircle2, Save, UserCircle, Unlink, XCircle } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { api } from "../api/client"
 import { Button, Card, FadeIn, Input, Label, PageHeader, Spinner, Textarea } from "../components/ui"
 import { TagList } from "../components/TagList"
-import { CredentialGroup } from "../components/CredentialGroup"
-import type { BrandProfile, CredentialGroups } from "../lib/types"
+import { useAuth } from "../lib/auth"
+import type { BrandProfile } from "../lib/types"
+
+interface InstagramStatus {
+  connected: boolean
+  username?: string
+  connected_at?: string
+}
 
 export function Settings() {
+  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
   const [brand, setBrand] = useState<BrandProfile | null>(null)
   const [savingBrand, setSavingBrand] = useState(false)
-  const [groups, setGroups] = useState<CredentialGroups | null>(null)
+  const [ig, setIg] = useState<InstagramStatus | null>(null)
 
   async function loadBrand() {
     const res = await api.get<{ exists: boolean; brand: BrandProfile | null }>("/brand")
     setBrand(res.brand)
   }
 
-  async function loadCredentials() {
-    const res = await api.get<{ groups: CredentialGroups }>("/credentials")
-    setGroups(res.groups)
+  async function loadInstagram() {
+    const res = await api.get<InstagramStatus>("/instagram/status")
+    setIg(res)
   }
 
   useEffect(() => {
     loadBrand()
-    loadCredentials()
+    loadInstagram()
   }, [])
 
   function update<K extends keyof BrandProfile>(key: K, value: BrandProfile[K]) {
@@ -40,11 +49,78 @@ export function Settings() {
     }
   }
 
+  async function disconnectInstagram() {
+    await api.delete("/instagram/connection")
+    await loadInstagram()
+  }
+
+  const oauthResult = searchParams.get("instagram")
+
   return (
     <div>
-      <PageHeader eyebrow="Settings" title="Brand & integrations" description="Everything that powers your automation, in one place." />
+      <PageHeader eyebrow="Settings" title="Brand & account" description="Everything that powers your automation." />
 
-      <section className="mb-10">
+      {oauthResult === "connected" && (
+        <FadeIn>
+          <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            <CheckCircle2 className="h-4 w-4" /> Instagram connected successfully.
+          </div>
+        </FadeIn>
+      )}
+      {oauthResult === "denied" && (
+        <FadeIn>
+          <div className="mb-6 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+            <XCircle className="h-4 w-4" /> Instagram connection was cancelled.
+          </div>
+        </FadeIn>
+      )}
+
+      <section className="mb-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <FadeIn>
+          <Card>
+            <div className="mb-3 flex items-center gap-2">
+              <Camera className="h-5 w-5 text-[var(--color-primary)]" />
+              <h3 className="font-[var(--font-display)] font-bold">Instagram</h3>
+            </div>
+            {ig === null ? (
+              <Spinner className="h-4 w-4 text-[var(--color-text-faint)]" />
+            ) : ig.connected ? (
+              <div>
+                <p className="text-sm text-[var(--color-text)]">
+                  Connected as <span className="font-semibold">@{ig.username}</span>
+                </p>
+                <Button variant="outline" onClick={disconnectInstagram} className="mt-4 !px-3 !py-1.5 text-xs">
+                  <Unlink className="h-3.5 w-3.5" /> Disconnect
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <p className="mb-4 text-sm text-[var(--color-text-muted)]">
+                  Connect your Instagram account so Reelmind can publish on your behalf.
+                </p>
+                <a href="/api/instagram/connect">
+                  <Button className="!px-4 !py-2 text-sm">Connect Instagram</Button>
+                </a>
+              </div>
+            )}
+          </Card>
+        </FadeIn>
+
+        <FadeIn delay={0.05}>
+          <Card>
+            <div className="mb-3 flex items-center gap-2">
+              <UserCircle className="h-5 w-5 text-[var(--color-primary)]" />
+              <h3 className="font-[var(--font-display)] font-bold">Account</h3>
+            </div>
+            <p className="text-sm text-[var(--color-text)]">{user?.email}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              Full access to uploads, scheduling, and AI content creation.
+            </p>
+          </Card>
+        </FadeIn>
+      </section>
+
+      <section>
         <h2 className="mb-4 font-[var(--font-display)] text-lg font-bold">Brand profile</h2>
         {!brand ? (
           <div className="flex justify-center py-10">
@@ -112,62 +188,6 @@ export function Settings() {
               </div>
             </Card>
           </FadeIn>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-4 font-[var(--font-display)] text-lg font-bold">Integrations</h2>
-        {!groups ? (
-          <div className="flex justify-center py-10">
-            <Spinner className="h-5 w-5 text-[var(--color-text-faint)]" />
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <FadeIn delay={0.02}>
-              <CredentialGroup
-                title="Content strategy (LLM)"
-                description="Generates the 90-day calendar, scripts, captions, and hashtags."
-                fields={groups.llm}
-                testKey="llm"
-                onSaved={loadCredentials}
-              />
-            </FadeIn>
-            <FadeIn delay={0.04}>
-              <CredentialGroup
-                title="Video engine"
-                description="Turns each script into a Reel."
-                fields={groups.video}
-                testKey="video"
-                onSaved={loadCredentials}
-              />
-            </FadeIn>
-            <FadeIn delay={0.06}>
-              <CredentialGroup
-                title="Instagram"
-                description="Publishes approved Reels to your account."
-                fields={groups.instagram}
-                testKey="instagram"
-                onSaved={loadCredentials}
-              />
-            </FadeIn>
-            <FadeIn delay={0.1}>
-              <CredentialGroup
-                title="Storage"
-                description="Hosts generated videos so Instagram can fetch them."
-                fields={groups.storage}
-                testKey="storage"
-                onSaved={loadCredentials}
-              />
-            </FadeIn>
-            <FadeIn delay={0.12}>
-              <CredentialGroup
-                title="Dashboard access"
-                description="Your login password for this dashboard."
-                fields={groups.dashboard}
-                onSaved={loadCredentials}
-              />
-            </FadeIn>
-          </div>
         )}
       </section>
     </div>

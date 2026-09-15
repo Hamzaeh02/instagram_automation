@@ -19,17 +19,16 @@ class InstagramPublishError(RuntimeError):
 
 class InstagramPublisher:
     """Uses the Instagram API with Instagram Login (graph.instagram.com) - no
-    linked Facebook Page required. Needs an Instagram User Access Token with
-    the instagram_business_content_publish + instagram_business_basic scopes,
-    obtained via Business Login for Instagram in the Meta App Dashboard."""
+    linked Facebook Page required. Takes a per-user Instagram User Access
+    Token (instagram_business_content_publish + instagram_business_basic
+    scopes) obtained via the platform's OAuth connect flow - credentials are
+    per-tenant, never read from platform-level settings."""
 
-    def __init__(self):
-        self.ig_user_id = settings.ig_business_account_id
-        self.token = settings.instagram_access_token
-        if not (self.ig_user_id and self.token):
-            raise InstagramPublishError(
-                "IG_BUSINESS_ACCOUNT_ID and INSTAGRAM_ACCESS_TOKEN must both be set"
-            )
+    def __init__(self, ig_user_id: str, access_token: str):
+        if not (ig_user_id and access_token):
+            raise InstagramPublishError("ig_user_id and access_token are required")
+        self.ig_user_id = ig_user_id
+        self.token = access_token
         base_url = f"https://graph.instagram.com/{settings.instagram_graph_api_version}"
         self._client = httpx.Client(base_url=base_url, timeout=60)
 
@@ -41,16 +40,15 @@ class InstagramPublisher:
         resp.raise_for_status()
         return resp.json()
 
-    def create_container(self, video_url: str, caption: str) -> str:
-        resp = self._client.post(
-            f"/{self.ig_user_id}/media",
-            data={
-                "media_type": "REELS",
-                "video_url": video_url,
-                "caption": caption,
-                "access_token": self.token,
-            },
-        )
+    def create_container(self, media_url: str, caption: str, media_type: str = "REELS") -> str:
+        data = {"caption": caption, "access_token": self.token}
+        if media_type == "IMAGE":
+            data["image_url"] = media_url
+        else:
+            data["media_type"] = "REELS"
+            data["video_url"] = media_url
+
+        resp = self._client.post(f"/{self.ig_user_id}/media", data=data)
         resp.raise_for_status()
         creation_id = resp.json().get("id")
         if not creation_id:
@@ -93,10 +91,11 @@ class InstagramPublisher:
         resp.raise_for_status()
         return resp.json().get("permalink", "")
 
-    def publish_reel(self, video_url: str, caption: str) -> tuple[str, str, str]:
+    def publish_reel(self, media_url: str, caption: str, media_type: str = "REELS") -> tuple[str, str, str]:
         """Full flow: create container -> wait -> publish -> permalink.
-        Returns (creation_id, media_id, permalink)."""
-        creation_id = self.create_container(video_url, caption)
+        Returns (creation_id, media_id, permalink). `media_type` is "REELS"
+        (video_url) or "IMAGE" (image_url)."""
+        creation_id = self.create_container(media_url, caption, media_type)
         self.wait_until_ready(creation_id)
         media_id = self.publish(creation_id)
         permalink = self.get_permalink(media_id)

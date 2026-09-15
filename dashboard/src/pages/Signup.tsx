@@ -7,8 +7,8 @@ import { Button, Input, Label } from "../components/ui"
 import { Scene3D } from "../components/Scene3D"
 import { useAuth } from "../lib/auth"
 
-export function Login() {
-  const { login } = useAuth()
+export function Signup() {
+  const { signup } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +19,7 @@ export function Login() {
     setError(null)
     setLoading(true)
     try {
-      await login(email, password)
+      await signup(email, password)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong")
     } finally {
@@ -41,8 +41,12 @@ export function Login() {
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-lg shadow-violet-900/40">
             <Sparkles className="h-6 w-6 text-white" strokeWidth={2.5} />
           </div>
-          <h1 className="font-[var(--font-display)] text-2xl font-bold">Welcome back</h1>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">Sign in to Reelmind</p>
+          <h1 className="font-[var(--font-display)] text-2xl font-bold">
+            Create your <span className="gradient-text">Reelmind</span> account
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+            Upload &amp; schedule your own content, or generate it with AI — all included.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -68,7 +72,7 @@ export function Login() {
               <Input
                 type="password"
                 className="pl-10"
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -82,14 +86,14 @@ export function Login() {
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "Creating account…" : "Create account"}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">
-          New here?{" "}
-          <Link to="/signup" className="font-medium text-[var(--color-primary)] hover:underline">
-            Create an account
+          Already have an account?{" "}
+          <Link to="/login" className="font-medium text-[var(--color-primary)] hover:underline">
+            Sign in
           </Link>
         </p>
       </motion.div>

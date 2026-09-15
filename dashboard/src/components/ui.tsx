@@ -71,6 +71,18 @@ export function Label({ children }: { children: ReactNode }) {
   )
 }
 
+/** Same as Label, but with room for a trailing action (e.g. an AI-improve button). */
+export function FieldLabelRow({ label, action }: { label: string; action?: ReactNode }) {
+  return (
+    <div className="mb-1.5 flex items-center justify-between gap-2">
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+        {label}
+      </label>
+      {action}
+    </div>
+  )
+}
+
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">

@@ -1,48 +1,33 @@
 import { motion } from "framer-motion"
-import { Film, Cloud, Camera, Sparkles, Zap, PlayCircle } from "lucide-react"
+import { Camera, ClipboardCheck, PlayCircle, Zap } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/client"
 import { Button, Card, FadeIn, PageHeader, Spinner } from "../components/ui"
 import { StatusBadge } from "../components/StatusBadge"
-import type { CredentialGroups, Post, RunLogEntry } from "../lib/types"
+import type { BrandProfile, Post, RunLogEntry } from "../lib/types"
 
-const GROUP_META: Record<string, { label: string; icon: typeof Sparkles }> = {
-  llm: { label: "Content strategy", icon: Sparkles },
-  video: { label: "Video engine", icon: Film },
-  instagram: { label: "Instagram", icon: Camera },
-  storage: { label: "Storage", icon: Cloud },
-}
-
-// Some groups offer a choice of provider (e.g. LLM_PROVIDER=anthropic|groq) -
-// only the active provider's key should count toward "configured", not every
-// field in the group (the inactive provider's key is expected to be blank).
-function isGroupConfigured(key: string, fields: import("../lib/types").CredentialField[]): boolean {
-  const byName = Object.fromEntries(fields.map((f) => [f.name, f]))
-  if (key === "llm") {
-    const activeKey = byName.llm_provider?.value === "groq" ? byName.groq_api_key : byName.anthropic_api_key
-    return Boolean(activeKey?.configured)
-  }
-  if (key === "video") {
-    const activeKey = byName.video_engine?.value === "broll" ? byName.pexels_api_key : byName.heygen_api_key
-    return Boolean(activeKey?.configured)
-  }
-  return fields.length > 0 && fields.every((f) => f.configured)
+interface InstagramStatus {
+  connected: boolean
+  username?: string
 }
 
 export function Dashboard() {
-  const [groups, setGroups] = useState<CredentialGroups | null>(null)
+  const [ig, setIg] = useState<InstagramStatus | null>(null)
+  const [brand, setBrand] = useState<BrandProfile | null>(null)
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [activity, setActivity] = useState<RunLogEntry[] | null>(null)
   const [running, setRunning] = useState(false)
 
   async function load() {
-    const [creds, postsRes, activityRes] = await Promise.all([
-      api.get<{ groups: CredentialGroups }>("/credentials"),
+    const [igRes, brandRes, postsRes, activityRes] = await Promise.all([
+      api.get<InstagramStatus>("/instagram/status"),
+      api.get<{ brand: BrandProfile | null }>("/brand"),
       api.get<{ posts: Post[] }>("/posts?limit=8"),
       api.get<{ runs: RunLogEntry[] }>("/activity?limit=5"),
     ])
-    setGroups(creds.groups)
+    setIg(igRes)
+    setBrand(brandRes.brand)
     setPosts(postsRes.posts)
     setActivity(activityRes.runs)
   }
@@ -61,12 +46,31 @@ export function Dashboard() {
     }
   }
 
+  const brandReady = Boolean(brand?.brand_name && brand?.niche)
+
+  const cards = [
+    {
+      key: "instagram",
+      label: "Instagram",
+      icon: Camera,
+      ok: Boolean(ig?.connected),
+      detail: ig?.connected ? `@${ig?.username}` : "Not connected",
+    },
+    {
+      key: "brand",
+      label: "Brand profile",
+      icon: ClipboardCheck,
+      ok: brandReady,
+      detail: brandReady ? "Complete" : "Incomplete",
+    },
+  ]
+
   return (
     <div>
       <PageHeader
         eyebrow="Overview"
         title="Your content engine"
-        description="Everything running end to end — plan, generate, review, publish."
+        description="Everything running end to end — schedule, generate, review, publish."
         actions={
           <Button onClick={runNow} disabled={running}>
             {running ? <Spinner className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
@@ -75,31 +79,19 @@ export function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {Object.entries(GROUP_META).map(([key, meta], i) => {
-          const fields = groups?.[key] ?? []
-          const configured = isGroupConfigured(key, fields)
-          const partial = !configured && fields.some((f) => f.configured)
-          return (
-            <FadeIn key={key} delay={i * 0.05}>
-              <Card className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <meta.icon className="h-5 w-5 text-[var(--color-text-muted)]" strokeWidth={1.75} />
-                  <span
-                    className={
-                      "h-2 w-2 rounded-full " +
-                      (configured ? "bg-emerald-400" : partial ? "bg-amber-400" : "bg-slate-600")
-                    }
-                  />
-                </div>
-                <div className="text-sm font-semibold">{meta.label}</div>
-                <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                  {configured ? "Connected" : partial ? "Incomplete" : "Not set up"}
-                </div>
-              </Card>
-            </FadeIn>
-          )
-        })}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {cards.map((c, i) => (
+          <FadeIn key={c.key} delay={i * 0.05}>
+            <Card className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <c.icon className="h-5 w-5 text-[var(--color-text-muted)]" strokeWidth={1.75} />
+                <span className={"h-2 w-2 rounded-full " + (c.ok ? "bg-emerald-400" : "bg-amber-400")} />
+              </div>
+              <div className="text-sm font-semibold">{c.label}</div>
+              <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{c.detail}</div>
+            </Card>
+          </FadeIn>
+        ))}
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -119,7 +111,7 @@ export function Dashboard() {
               )}
               {posts?.length === 0 && (
                 <p className="px-6 py-8 text-sm text-[var(--color-text-muted)]">
-                  No posts planned yet — generate your calendar to get started.
+                  No posts planned yet — upload content or generate your calendar to get started.
                 </p>
               )}
               {posts?.map((p, i) => (
@@ -136,7 +128,13 @@ export function Dashboard() {
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{p.title || "Untitled"}</div>
                       <div className="text-xs text-[var(--color-text-faint)]">
-                        {p.scheduled_date} · {p.pillar}
+                        {new Date(p.scheduled_at).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {p.pillar || p.source}
                       </div>
                     </div>
                     <StatusBadge status={p.status} />

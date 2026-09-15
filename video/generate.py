@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from common.config import BrandConfig, settings
+from common.config import settings
 from common.logging import get_logger
+from db.models import BrandProfile
 
 logger = get_logger(__name__)
 
 
-def generate_video_for_post(post, dest_dir: str, brand: BrandConfig) -> str:
+def generate_video_for_post(post, dest_dir: str, brand: BrandProfile) -> str:
     """Dispatches to whichever video engine is active (VIDEO_ENGINE=broll|heygen).
     Both engines return a finished, Reels-ready (1080x1920) local mp4 path."""
     engine = settings.video_engine

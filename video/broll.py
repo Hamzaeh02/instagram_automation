@@ -42,6 +42,19 @@ class PexelsClient:
         candidates = portrait or files
         return max(candidates, key=lambda f: f.get("height", 0))
 
+    def search_photos(self, query: str, per_page: int = 6) -> list[dict]:
+        resp = self._client.get(
+            "/v1/search",
+            params={"query": query, "orientation": "portrait", "per_page": per_page},
+        )
+        resp.raise_for_status()
+        return resp.json().get("photos", [])
+
+    @staticmethod
+    def pick_best_photo_url(photo: dict) -> str | None:
+        src = photo.get("src", {})
+        return src.get("portrait") or src.get("large2x") or src.get("original")
+
     def download(self, url: str, dest_path: str) -> str:
         with self._client.stream("GET", url, timeout=120) as resp:
             resp.raise_for_status()
