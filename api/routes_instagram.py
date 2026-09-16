@@ -8,6 +8,7 @@ from starlette.responses import RedirectResponse
 from api.auth import require_auth
 from common.config import settings
 from common.logging import get_logger
+from common.timeutil import utc_iso
 from db.models import InstagramConnection, User
 from db.session import get_session
 
@@ -33,21 +34,21 @@ def status(user: User = Depends(require_auth)):
         conn = session.query(InstagramConnection).filter(InstagramConnection.user_id == user.id).first()
         if not conn or not conn.access_token:
             return {"connected": False}
-        return {"connected": True, "username": conn.ig_username, "connected_at": conn.connected_at.isoformat()}
+        return {"connected": True, "username": conn.ig_username, "connected_at": utc_iso(conn.connected_at)}
     finally:
         session.close()
 
 
 @router.get("/connect")
 def connect(user: User = Depends(require_auth)):
-    if not (settings.meta_app_id and settings.instagram_oauth_redirect_uri):
+    if not (settings.instagram_app_id and settings.instagram_oauth_redirect_uri):
         raise HTTPException(
             status_code=500,
-            detail="Instagram connect isn't configured on the server (META_APP_ID / INSTAGRAM_OAUTH_REDIRECT_URI)",
+            detail="Instagram connect isn't configured on the server (INSTAGRAM_APP_ID / INSTAGRAM_OAUTH_REDIRECT_URI)",
         )
     state = _state_serializer().dumps({"user_id": user.id})
     params = {
-        "client_id": settings.meta_app_id,
+        "client_id": settings.instagram_app_id,
         "redirect_uri": settings.instagram_oauth_redirect_uri,
         "response_type": "code",
         "scope": SCOPES,
@@ -76,8 +77,8 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
         token_resp = client.post(
             TOKEN_URL,
             data={
-                "client_id": settings.meta_app_id,
-                "client_secret": settings.meta_app_secret,
+                "client_id": settings.instagram_app_id,
+                "client_secret": settings.instagram_app_secret,
                 "grant_type": "authorization_code",
                 "redirect_uri": settings.instagram_oauth_redirect_uri,
                 "code": code,
@@ -92,7 +93,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
             f"{GRAPH_BASE}/access_token",
             params={
                 "grant_type": "ig_exchange_token",
-                "client_secret": settings.meta_app_secret,
+                "client_secret": settings.instagram_app_secret,
                 "access_token": short_token,
             },
         )

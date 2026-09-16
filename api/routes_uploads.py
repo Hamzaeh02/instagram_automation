@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from api.auth import require_auth
 from common.logging import get_logger
+from common.platforms import connected_platforms
 from db.models import Post, PostSource, PostStatus, User
 from db.session import get_session
 from storage.upload import upload_file
@@ -67,6 +68,7 @@ async def create_upload(
             source=PostSource.USER_UPLOADED.value,
             media_type=media_type,
             scheduled_at=parsed_datetime,
+            target_platforms=connected_platforms(session, user.id),
             title=title.strip() or (file.filename or "Untitled"),
             caption=caption,
             hashtags=hashtags,

@@ -17,12 +17,21 @@ _connect_args = {"check_same_thread": False} if _is_sqlite else {}
 engine = create_engine(settings.database_url, connect_args=_connect_args)
 
 if _is_sqlite:
-    # SQLite ignores FK constraints (including ON DELETE CASCADE) unless this
-    # is set on every connection - it's off by default for backward compat.
     @event.listens_for(engine, "connect")
-    def _enable_sqlite_fk(dbapi_connection, _record) -> None:
+    def _configure_sqlite(dbapi_connection, _record) -> None:
         cursor = dbapi_connection.cursor()
+        # SQLite ignores FK constraints (including ON DELETE CASCADE) unless
+        # this is set on every connection - it's off by default for backward
+        # compat.
         cursor.execute("PRAGMA foreign_keys=ON")
+        # WAL lets readers (API requests) and the writer (background
+        # orchestrator jobs generating/publishing content) run concurrently
+        # instead of blocking each other on SQLite's default rollback-journal
+        # locking - this is what previously caused "database is locked"
+        # errors under any concurrent load. One-time cost, persists in the
+        # database file itself.
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
 
 

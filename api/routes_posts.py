@@ -9,14 +9,27 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from api.auth import require_auth
-from db.models import Post, User
+from common.timeutil import utc_iso
+from db.models import Platform, Post, PostPublication, User
 from db.session import get_session
 from review.actions import ActionError, approve_post, reject_post_with_reason
 
 router = APIRouter(prefix="/api/posts", tags=["posts"], dependencies=[Depends(require_auth)])
 
+VALID_PLATFORMS = {p.value for p in Platform}
 
-def _post_to_dict(post: Post) -> dict:
+
+def _publication_to_dict(pub: PostPublication) -> dict:
+    return {
+        "platform": pub.platform,
+        "status": pub.status,
+        "permalink": pub.permalink,
+        "error_message": pub.error_message,
+        "published_at": utc_iso(pub.published_at),
+    }
+
+
+def _post_to_dict(post: Post, publications: list[PostPublication] | None = None) -> dict:
     return {
         "id": post.id,
         "source": post.source,
@@ -31,15 +44,16 @@ def _post_to_dict(post: Post) -> dict:
         "hashtags": post.hashtags,
         "title": post.title,
         "broll_keywords": post.broll_keywords,
+        "target_platforms": post.target_platforms or [],
+        "publications": [_publication_to_dict(p) for p in (publications or [])],
         "status": post.status,
         "retry_count": post.retry_count,
         "reject_reason": post.reject_reason,
         "error_message": post.error_message,
         "has_video": bool(post.video_local_path),
         "video_url": post.video_url,
-        "ig_permalink": post.ig_permalink,
-        "created_at": post.created_at.isoformat(),
-        "updated_at": post.updated_at.isoformat(),
+        "created_at": utc_iso(post.created_at),
+        "updated_at": utc_iso(post.updated_at),
     }
 
 
@@ -48,6 +62,10 @@ def _get_owned_post_or_404(session, post_id: int, user_id: int) -> Post:
     if not post or post.user_id != user_id:
         raise HTTPException(status_code=404, detail="Post not found")
     return post
+
+
+def _publications_for(session, post_id: int) -> list[PostPublication]:
+    return session.scalars(select(PostPublication).where(PostPublication.post_id == post_id)).all()
 
 
 @router.get("")
@@ -70,7 +88,14 @@ def list_posts(
             query = query.where(Post.scheduled_at <= dt.datetime.combine(dt.date.fromisoformat(to_date), dt.time.max))
         query = query.offset(offset).limit(limit)
         posts = session.scalars(query).all()
-        return {"posts": [_post_to_dict(p) for p in posts]}
+
+        pubs_by_post: dict[int, list[PostPublication]] = {}
+        if posts:
+            post_ids = [p.id for p in posts]
+            for pub in session.scalars(select(PostPublication).where(PostPublication.post_id.in_(post_ids))).all():
+                pubs_by_post.setdefault(pub.post_id, []).append(pub)
+
+        return {"posts": [_post_to_dict(p, pubs_by_post.get(p.id, [])) for p in posts]}
     finally:
         session.close()
 
@@ -80,7 +105,7 @@ def get_post(post_id: int, user: User = Depends(require_auth)):
     session = get_session()
     try:
         post = _get_owned_post_or_404(session, post_id, user.id)
-        return _post_to_dict(post)
+        return _post_to_dict(post, _publications_for(session, post_id))
     finally:
         session.close()
 
@@ -116,7 +141,7 @@ def approve(post_id: int, user: User = Depends(require_auth)):
             post = approve_post(session, post_id, user.id)
         except ActionError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return _post_to_dict(post)
+        return _post_to_dict(post, _publications_for(session, post_id))
     finally:
         session.close()
 
@@ -133,7 +158,7 @@ def reject(post_id: int, body: RejectRequest, user: User = Depends(require_auth)
             post = reject_post_with_reason(session, post_id, user.id, body.reason)
         except ActionError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return _post_to_dict(post)
+        return _post_to_dict(post, _publications_for(session, post_id))
     finally:
         session.close()
 
@@ -146,6 +171,7 @@ class PostEdit(BaseModel):
     on_screen_text: str | None = None
     broll_keywords: str | None = None
     scheduled_at: str | None = None  # ISO datetime, e.g. from an HTML datetime-local input
+    target_platforms: list[str] | None = None
 
 
 @router.patch("/{post_id}")
@@ -159,10 +185,14 @@ def edit_post(post_id: int, body: PostEdit, user: User = Depends(require_auth)):
                 updates["scheduled_at"] = dt.datetime.fromisoformat(updates["scheduled_at"])
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail="Invalid scheduled_at") from exc
+        if "target_platforms" in updates:
+            invalid = set(updates["target_platforms"]) - VALID_PLATFORMS
+            if invalid:
+                raise HTTPException(status_code=400, detail=f"Unknown platform(s): {', '.join(invalid)}")
         for key, value in updates.items():
             setattr(post, key, value)
         session.commit()
-        return _post_to_dict(post)
+        return _post_to_dict(post, _publications_for(session, post_id))
     finally:
         session.close()
 

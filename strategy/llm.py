@@ -8,7 +8,14 @@ from common.logging import get_logger
 
 logger = get_logger(__name__)
 
-MAX_TOKENS = 4096
+# A batch of BATCH_SIZE=10 Reels, each needing a full 30-60s voiceover
+# script plus hook/caption/hashtags/etc, comfortably exceeds 4096 tokens -
+# that limit was causing the model's JSON response to get cut off mid-field,
+# which _extract_json_array/_extract_json_object then correctly rejected as
+# malformed (rather than silently accepting truncated content), failing the
+# whole batch. Every brand-new signup hit this on their very first calendar
+# generation. Raised with headroom for the largest realistic batch.
+MAX_TOKENS = 8192
 
 
 def extract_json_object(text: str) -> dict:

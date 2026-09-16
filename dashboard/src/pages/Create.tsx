@@ -3,14 +3,7 @@ import { ArrowRight, Sparkles, Wand2 } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { api, ApiError } from "../api/client"
-import { Button, Card, FadeIn, Label, PageHeader, Textarea, Input } from "../components/ui"
-
-const EXAMPLES = [
-  "A quick tip for people who keep skipping leg day",
-  "Behind the scenes of how we make our candles",
-  "3 mistakes beginners make with home workouts",
-  "Answer the question we get asked the most: is this worth the price?",
-]
+import { Button, Card, FadeIn, Label, PageHeader, Spinner, Textarea, Input } from "../components/ui"
 
 function defaultScheduledAt() {
   const d = new Date()
@@ -62,18 +55,6 @@ export function Create() {
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="e.g. A quick tip for people who keep skipping leg day"
               />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {EXAMPLES.map((ex) => (
-                  <button
-                    key={ex}
-                    type="button"
-                    onClick={() => setPrompt(ex)}
-                    className="rounded-full border border-[var(--color-border)] px-2.5 py-1 text-[11px] text-[var(--color-text-muted)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]"
-                  >
-                    {ex}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div>
@@ -85,7 +66,9 @@ export function Create() {
 
             <Button onClick={submit} disabled={!prompt.trim() || loading} className="w-full">
               {loading ? (
-                "Starting…"
+                <>
+                  <Spinner className="h-4 w-4" /> Starting…
+                </>
               ) : (
                 <>
                   <Wand2 className="h-4 w-4" /> Generate this post <ArrowRight className="h-4 w-4" />

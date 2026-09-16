@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { CalendarPlus, ChevronRight, Film, Image as ImageIcon, Sparkles } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { CalendarPlus, Check, ChevronRight, Film, Image as ImageIcon, Sparkles, XCircle } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api, ApiError } from "../api/client"
 import { Button, Card, FadeIn, Label, PageHeader, Spinner, Textarea } from "../components/ui"
@@ -22,11 +22,16 @@ const MEDIA_FILTERS: { label: string; value: "all" | "REELS" | "IMAGE"; icon: ty
   { label: "Posts", value: "IMAGE", icon: ImageIcon },
 ]
 
+const POLL_MS = 3000
+const POLL_TIMEOUT_MS = 5 * 60 * 1000
+
 export function Calendar() {
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [statusFilter, setStatusFilter] = useState<PostStatus | "all">("all")
   const [mediaFilter, setMediaFilter] = useState<"all" | "REELS" | "IMAGE">("all")
   const [showGenerate, setShowGenerate] = useState(false)
+  const [runState, setRunState] = useState<{ status: "running" | "done" | "error"; message?: string } | null>(null)
+  const pollRef = useRef<number | null>(null)
 
   async function load() {
     const res = await api.get<{ posts: Post[] }>("/posts?limit=200")
@@ -35,7 +40,38 @@ export function Calendar() {
 
   useEffect(() => {
     load()
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current)
+    }
   }, [])
+
+  function watchRun() {
+    setRunState({ status: "running" })
+    const startedAt = Date.now()
+    const before = new Set((posts ?? []).map((p) => p.id))
+
+    pollRef.current = window.setInterval(async () => {
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        if (pollRef.current) window.clearInterval(pollRef.current)
+        setRunState({ status: "error", message: "This is taking longer than expected — check back shortly." })
+        return
+      }
+      const [activityRes] = await Promise.all([api.get<{ runs: RunLogEntry[] }>("/activity?limit=1"), load()])
+      const latest = activityRes.runs[0]
+      if (latest && latest.status !== "running" && new Date(latest.started_at).getTime() >= startedAt - POLL_MS) {
+        if (pollRef.current) window.clearInterval(pollRef.current)
+        if (latest.status === "error") {
+          setRunState({ status: "error", message: latest.error || "Generation failed" })
+        } else {
+          const res = await api.get<{ posts: Post[] }>("/posts?limit=200")
+          setPosts(res.posts)
+          const added = res.posts.filter((p) => !before.has(p.id)).length
+          setRunState({ status: "done", message: added > 0 ? `Generated ${added} new post${added === 1 ? "" : "s"}.` : "Done — nothing new to add." })
+        }
+        setTimeout(() => setRunState((s) => (s?.status === "done" ? null : s)), 6000)
+      }
+    }, POLL_MS)
+  }
 
   const filtered = useMemo(() => {
     if (!posts) return []
@@ -69,6 +105,41 @@ export function Calendar() {
           </Button>
         }
       />
+
+      <AnimatePresence>
+        {runState && (
+          <FadeIn>
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={
+                "mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm " +
+                (runState.status === "running"
+                  ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
+                  : runState.status === "done"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/30 bg-rose-500/10 text-rose-300")
+              }
+            >
+              {runState.status === "running" ? (
+                <>
+                  <Spinner className="h-4 w-4" /> Generating your content in the background — feel free to keep
+                  browsing, this'll update on its own.
+                </>
+              ) : runState.status === "done" ? (
+                <>
+                  <Check className="h-4 w-4" /> {runState.message}
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4" /> {runState.message}
+                </>
+              )}
+            </motion.div>
+          </FadeIn>
+        )}
+      </AnimatePresence>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
@@ -180,50 +251,37 @@ export function Calendar() {
         ))}
       </div>
 
-      <GenerateModal open={showGenerate} onClose={() => setShowGenerate(false)} onDone={load} />
+      <GenerateModal
+        open={showGenerate}
+        onClose={() => setShowGenerate(false)}
+        onStarted={() => {
+          setShowGenerate(false)
+          watchRun()
+        }}
+      />
     </div>
   )
 }
 
-function GenerateModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted: () => void }) {
   const [contentType, setContentType] = useState<"video" | "post">("video")
   const [brief, setBrief] = useState("")
   const [days, setDays] = useState(90)
-  const [generating, setGenerating] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function generate() {
+  async function start() {
     if (!brief.trim()) return
-    setGenerating(true)
+    setStarting(true)
     setError(null)
     try {
       await api.post("/calendar/generate", { days, content_type: contentType, brief: brief.trim() })
-      // Generation runs server-side as a background task (it makes several
-      // slow LLM calls) - poll the activity log rather than holding one long
-      // HTTP request open, which was fragile (interrupted by navigation,
-      // proxy timeouts, etc.) and left the button stuck spinning.
-      const startedAt = Date.now()
-      const POLL_MS = 3000
-      const TIMEOUT_MS = 5 * 60 * 1000
-      while (Date.now() - startedAt < TIMEOUT_MS) {
-        await new Promise((r) => setTimeout(r, POLL_MS))
-        const res = await api.get<{ runs: RunLogEntry[] }>("/activity?limit=1")
-        const latest = res.runs[0]
-        if (latest && latest.status !== "running" && new Date(latest.started_at).getTime() >= startedAt - POLL_MS) {
-          if (latest.status === "error") {
-            setError(latest.error || "Generation failed")
-            return
-          }
-          break
-        }
-      }
-      await onDone()
       setBrief("")
-      onClose()
+      onStarted()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't start generating")
     } finally {
-      setGenerating(false)
+      setStarting(false)
     }
   }
 
@@ -235,7 +293,7 @@ function GenerateModal({ open, onClose, onDone }: { open: boolean; onClose: () =
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => !generating && onClose()}
+          onClick={() => !starting && onClose()}
         >
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
@@ -310,12 +368,12 @@ function GenerateModal({ open, onClose, onDone }: { open: boolean; onClose: () =
             {error && <p className="mt-4 text-sm text-rose-400">{error}</p>}
 
             <div className="mt-6 flex justify-end gap-3">
-              <Button variant="ghost" onClick={onClose} disabled={generating}>
+              <Button variant="ghost" onClick={onClose} disabled={starting}>
                 Cancel
               </Button>
-              <Button onClick={generate} disabled={generating || !brief.trim()}>
-                {generating ? <Spinner className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
-                {generating ? "Generating…" : "Generate"}
+              <Button onClick={start} disabled={starting || !brief.trim()}>
+                {starting ? <Spinner className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
+                {starting ? "Starting…" : "Generate"}
               </Button>
             </div>
           </motion.div>

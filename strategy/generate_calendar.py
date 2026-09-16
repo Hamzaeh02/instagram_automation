@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from common.logging import get_logger
+from common.platforms import connected_platforms
 from db.models import BrandProfile, Post, PostStatus
 from strategy.llm import extract_json_object, generate_text
 
@@ -73,11 +74,11 @@ def _build_prompt(
         shape = """{
     "scheduled_date": "YYYY-MM-DD",
     "pillar": "which content pillar this belongs to",
-    "hook": "the first line of the caption, written to stop the scroll",
+    "hook": "the first line of the caption - must stop the scroll and earn the read, no generic throat-clearing",
     "video_concept": "1-2 sentence description of the moment/scene the photo should capture",
-    "caption": "the Instagram caption to post, matching the brand tone, including the call-to-action",
-    "hashtags": "space-separated hashtags following the hashtag style guidance",
-    "title": "short internal title for this post, used for alt text and file naming",
+    "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
+    "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
+    "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
     "broll_keywords": "3-5 comma-separated stock-photo search terms (concrete, visual, searchable on a stock photo site) that match this post, most important first"
   }"""
     else:
@@ -85,17 +86,19 @@ def _build_prompt(
         shape = """{
     "scheduled_date": "YYYY-MM-DD",
     "pillar": "which content pillar this belongs to",
-    "hook": "the opening line/hook, first 1-2 seconds of the video",
+    "hook": "the opening line/hook, first 1-2 seconds of the video - must stop the scroll, earn the next second of attention, no generic throat-clearing",
     "video_concept": "1-2 sentence description of what the video shows/does",
-    "script": "full voiceover script, natural spoken language, 30-60 seconds when read aloud",
+    "script": "full voiceover script, natural spoken language, 30-60 seconds when read aloud, conversational not corporate",
     "on_screen_text": "short on-screen caption/text overlay for the video, or empty string if none",
-    "caption": "the Instagram caption to post, matching the brand tone, including the call-to-action",
-    "hashtags": "space-separated hashtags following the hashtag style guidance",
-    "title": "short internal title for this post, used for alt text and file naming",
+    "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
+    "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
+    "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
     "broll_keywords": "3-5 comma-separated stock-footage search terms (concrete, visual, searchable on a stock video site) that match this script's content, in the order they should appear"
   }"""
 
-    return f"""You are a social media strategist planning {format_desc} for this brand.
+    return f"""You are a social media strategist planning {format_desc} for this brand. Every field
+must be genuinely optimized for real social media performance, not just technically correct -
+these go straight into a review queue for publishing, not rough drafts.
 
 Brand: {brand.brand_name}
 Niche: {brand.niche}
@@ -148,6 +151,7 @@ def generate_calendar(
         return []
 
     media_type = "IMAGE" if content_type == "post" else "REELS"
+    default_platforms = connected_platforms(session, user_id)
 
     created: list[Post] = []
     recent_hooks: list[str] = list(
@@ -174,6 +178,7 @@ def generate_calendar(
                     dt.date.fromisoformat(item["scheduled_date"]), DEFAULT_POST_TIME
                 ),
                 media_type=media_type,
+                target_platforms=list(default_platforms),
                 pillar=item.get("pillar", ""),
                 hook=item.get("hook", ""),
                 video_concept=item.get("video_concept", ""),
@@ -197,9 +202,21 @@ def generate_calendar(
 
 def _build_single_prompt(brand: BrandProfile, prompt: str, scheduled_at: dt.datetime) -> str:
     banned = ", ".join(brand.banned_topics) or "none"
-    return f"""You are a social media strategist writing ONE Instagram Reel for this brand,
-based on a specific request from the creator.
+    return f"""You are a social media strategist writing ONE Instagram Reel for a creator, from their
+own specific request below. Every field must be genuinely optimized for real social media
+performance, not just technically correct - this is going straight into a review queue for
+publishing, not a rough draft.
 
+THE CREATOR'S REQUEST - this is the actual topic of the video, follow it exactly:
+"{prompt}"
+
+Write the video about exactly what the creator asked for above. Do not bend, reinterpret, or
+force the topic back toward the brand's product/niche below - only use the brand info to set the
+voice, tone, and call-to-action style. If the request has nothing to do with the brand's usual
+niche, that's fine: write about what was actually requested anyway. Only skip/reinterpret the
+request if it's one of the banned topics listed below.
+
+Brand voice reference (style only, not the topic):
 Brand: {brand.brand_name}
 Niche: {brand.niche}
 Audience: {brand.audience}
@@ -208,18 +225,16 @@ Banned topics (never mention): {banned}
 Call-to-action style: {brand.cta_style or "encourage engagement"}
 Hashtag style: {brand.hashtag_style or "8-12 relevant hashtags, mix of broad and niche"}
 
-The creator's request for this specific post: "{prompt}"
-
 Return ONLY a JSON object (no prose, no markdown fences) in this exact shape:
 {{
   "pillar": "which content theme this belongs to",
-  "hook": "the opening line/hook, first 1-2 seconds of the video",
+  "hook": "the opening line/hook, first 1-2 seconds of the video - must stop the scroll, earn the next second of attention, no generic throat-clearing",
   "video_concept": "1-2 sentence description of what the video shows/does",
-  "script": "full voiceover script, natural spoken language, 30-60 seconds when read aloud",
+  "script": "full voiceover script, natural spoken language, 30-60 seconds when read aloud, conversational not corporate",
   "on_screen_text": "short on-screen caption/text overlay for the video, or empty string if none",
-  "caption": "the Instagram caption to post, matching the brand tone, including the call-to-action",
-  "hashtags": "space-separated hashtags following the hashtag style guidance",
-  "title": "short internal title for this post, used for alt text and file naming",
+  "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
+  "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
+  "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
   "broll_keywords": "3-5 comma-separated stock-footage search terms (concrete, visual, searchable on a stock video site) that match this script's content, in the order they should appear"
 }}
 
@@ -238,6 +253,7 @@ def generate_single_post(
     post = Post(
         user_id=user_id,
         scheduled_at=scheduled_at,
+        target_platforms=connected_platforms(session, user_id),
         pillar=item.get("pillar", ""),
         hook=item.get("hook", ""),
         video_concept=item.get("video_concept", ""),

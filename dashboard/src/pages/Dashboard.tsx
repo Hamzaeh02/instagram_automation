@@ -1,32 +1,46 @@
-import { motion } from "framer-motion"
-import { Camera, ClipboardCheck, PlayCircle, Zap } from "lucide-react"
-import { useEffect, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { Briefcase, Camera, Check, ClipboardCheck, Globe, Music2, PlayCircle, XCircle, Zap } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/client"
 import { Button, Card, FadeIn, PageHeader, Spinner } from "../components/ui"
 import { StatusBadge } from "../components/StatusBadge"
 import type { BrandProfile, Post, RunLogEntry } from "../lib/types"
 
-interface InstagramStatus {
+interface PlatformStatus {
   connected: boolean
-  username?: string
+  needs_page?: boolean
+  needs_organization?: boolean
 }
 
+const POLL_MS = 3000
+const POLL_TIMEOUT_MS = 5 * 60 * 1000
+
 export function Dashboard() {
-  const [ig, setIg] = useState<InstagramStatus | null>(null)
+  const [ig, setIg] = useState<PlatformStatus | null>(null)
+  const [fb, setFb] = useState<PlatformStatus | null>(null)
+  const [li, setLi] = useState<PlatformStatus | null>(null)
+  const [tt, setTt] = useState<PlatformStatus | null>(null)
   const [brand, setBrand] = useState<BrandProfile | null>(null)
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [activity, setActivity] = useState<RunLogEntry[] | null>(null)
-  const [running, setRunning] = useState(false)
+  const [runState, setRunState] = useState<{ status: "running" | "done" | "error"; message?: string } | null>(null)
+  const pollRef = useRef<number | null>(null)
 
   async function load() {
-    const [igRes, brandRes, postsRes, activityRes] = await Promise.all([
-      api.get<InstagramStatus>("/instagram/status"),
+    const [igRes, fbRes, liRes, ttRes, brandRes, postsRes, activityRes] = await Promise.all([
+      api.get<PlatformStatus>("/instagram/status"),
+      api.get<PlatformStatus>("/facebook/status"),
+      api.get<PlatformStatus>("/linkedin/status"),
+      api.get<PlatformStatus>("/tiktok/status"),
       api.get<{ brand: BrandProfile | null }>("/brand"),
       api.get<{ posts: Post[] }>("/posts?limit=8"),
       api.get<{ runs: RunLogEntry[] }>("/activity?limit=5"),
     ])
     setIg(igRes)
+    setFb(fbRes)
+    setLi(liRes)
+    setTt(ttRes)
     setBrand(brandRes.brand)
     setPosts(postsRes.posts)
     setActivity(activityRes.runs)
@@ -34,19 +48,44 @@ export function Dashboard() {
 
   useEffect(() => {
     load()
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current)
+    }
   }, [])
 
   async function runNow() {
-    setRunning(true)
+    setRunState({ status: "running" })
     try {
       await api.post("/orchestrator/run")
-      setTimeout(load, 1500)
-    } finally {
-      setTimeout(() => setRunning(false), 1500)
+    } catch {
+      setRunState({ status: "error", message: "Couldn't start the automation run - try again." })
+      return
     }
+
+    const startedAt = Date.now()
+    pollRef.current = window.setInterval(async () => {
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        if (pollRef.current) window.clearInterval(pollRef.current)
+        setRunState({ status: "error", message: "This is taking longer than expected — check Recent activity below." })
+        return
+      }
+      const res = await api.get<{ runs: RunLogEntry[] }>("/activity?limit=1")
+      const latest = res.runs[0]
+      if (latest && latest.status !== "running" && new Date(latest.started_at).getTime() >= startedAt - POLL_MS) {
+        if (pollRef.current) window.clearInterval(pollRef.current)
+        await load()
+        if (latest.status === "error") {
+          setRunState({ status: "error", message: latest.error || "The run failed." })
+        } else {
+          setRunState({ status: "done", message: latest.summary || "Done." })
+        }
+        setTimeout(() => setRunState((s) => (s?.status === "done" ? null : s)), 6000)
+      }
+    }, POLL_MS)
   }
 
   const brandReady = Boolean(brand?.brand_name && brand?.niche)
+  const running = runState?.status === "running"
 
   const cards = [
     {
@@ -54,7 +93,28 @@ export function Dashboard() {
       label: "Instagram",
       icon: Camera,
       ok: Boolean(ig?.connected),
-      detail: ig?.connected ? `@${ig?.username}` : "Not connected",
+      detail: ig?.connected ? "Connected" : "Not connected",
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      icon: Globe,
+      ok: Boolean(fb?.connected && !fb.needs_page),
+      detail: fb?.connected && !fb.needs_page ? "Connected" : fb?.connected && fb.needs_page ? "Pick a Page" : "Not connected",
+    },
+    {
+      key: "linkedin",
+      label: "LinkedIn",
+      icon: Briefcase,
+      ok: Boolean(li?.connected),
+      detail: li?.connected ? "Connected" : "Not connected",
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      icon: Music2,
+      ok: Boolean(tt?.connected),
+      detail: tt?.connected ? "Connected" : "Not connected",
     },
     {
       key: "brand",
@@ -79,7 +139,42 @@ export function Dashboard() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <AnimatePresence>
+        {runState && (
+          <FadeIn>
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={
+                "mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm " +
+                (runState.status === "running"
+                  ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
+                  : runState.status === "done"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/30 bg-rose-500/10 text-rose-300")
+              }
+            >
+              {runState.status === "running" ? (
+                <>
+                  <Spinner className="h-4 w-4" /> Running your automation in the background — this'll update on
+                  its own.
+                </>
+              ) : runState.status === "done" ? (
+                <>
+                  <Check className="h-4 w-4" /> {runState.message}
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4" /> {runState.message}
+                </>
+              )}
+            </motion.div>
+          </FadeIn>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((c, i) => (
           <FadeIn key={c.key} delay={i * 0.05}>
             <Card className="p-4">

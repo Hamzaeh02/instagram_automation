@@ -1,18 +1,25 @@
-import { useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { api } from "./api/client"
 import { Spinner } from "./components/ui"
 import { Shell } from "./components/Shell"
 import { AuthProvider, useAuth } from "./lib/auth"
-import { Login } from "./pages/Login"
-import { Signup } from "./pages/Signup"
-import { Onboarding } from "./pages/Onboarding"
-import { Dashboard } from "./pages/Dashboard"
-import { Calendar } from "./pages/Calendar"
-import { Upload } from "./pages/Upload"
-import { Create } from "./pages/Create"
-import { PostDetail } from "./pages/PostDetail"
-import { Settings } from "./pages/Settings"
+
+// Route-level code splitting: Login/Signup pull in a full Three.js scene
+// (Scene3D) that was previously bundled into the app's single main chunk -
+// meaning every authenticated user paid for loading Three.js on every page
+// load even though it's only ever rendered on the two auth pages. Splitting
+// every page keeps that (and any future heavy page) out of the initial
+// payload entirely; each page's JS loads only when actually navigated to.
+const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })))
+const Signup = lazy(() => import("./pages/Signup").then((m) => ({ default: m.Signup })))
+const Onboarding = lazy(() => import("./pages/Onboarding").then((m) => ({ default: m.Onboarding })))
+const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })))
+const Calendar = lazy(() => import("./pages/Calendar").then((m) => ({ default: m.Calendar })))
+const Upload = lazy(() => import("./pages/Upload").then((m) => ({ default: m.Upload })))
+const Create = lazy(() => import("./pages/Create").then((m) => ({ default: m.Create })))
+const PostDetail = lazy(() => import("./pages/PostDetail").then((m) => ({ default: m.PostDetail })))
+const Settings = lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })))
 
 function FullScreenSpinner() {
   return (
@@ -24,11 +31,13 @@ function FullScreenSpinner() {
 
 function AnonRoutes() {
   return (
-    <Routes>
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    <Suspense fallback={<FullScreenSpinner />}>
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 
@@ -73,25 +82,29 @@ function AuthedApp() {
   }
 
   return (
-    <Routes>
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route
-        path="/*"
-        element={
-          <Shell>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/upload" element={<Upload />} />
-              <Route path="/create" element={<Create />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/posts/:id" element={<PostDetail />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Shell>
-        }
-      />
-    </Routes>
+    <Suspense fallback={<FullScreenSpinner />}>
+      <Routes>
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route
+          path="/*"
+          element={
+            <Shell>
+              <Suspense fallback={<FullScreenSpinner />}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/upload" element={<Upload />} />
+                  <Route path="/create" element={<Create />} />
+                  <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/posts/:id" element={<PostDetail />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </Shell>
+          }
+        />
+      </Routes>
+    </Suspense>
   )
 }
 

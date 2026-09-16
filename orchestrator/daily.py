@@ -3,13 +3,30 @@ from __future__ import annotations
 import datetime as dt
 import os
 
+import httpx
 from sqlalchemy import select
 
 from common.config import settings
 from common.logging import get_logger
-from db.models import BrandProfile, InstagramConnection, Post, PostStatus, RunLog, User
+from db.models import (
+    BrandProfile,
+    FacebookConnection,
+    InstagramConnection,
+    LinkedInConnection,
+    Platform,
+    Post,
+    PostPublication,
+    PostStatus,
+    PublicationStatus,
+    RunLog,
+    TikTokConnection,
+    User,
+)
 from db.session import get_session, init_db
-from publish.instagram import InstagramPublishError, InstagramPublisher
+from publish.facebook import FacebookPublisher
+from publish.instagram import InstagramPublisher
+from publish.linkedin import LinkedInPublisher
+from publish.tiktok import TikTokPublisher
 from storage.upload import upload_file, upload_video
 from strategy.generate_calendar import generate_calendar
 from video.generate import generate_video_for_post
@@ -98,7 +115,100 @@ def generate_pending_content(session, brand: BrandProfile, user_id: int) -> None
             session.commit()
 
 
-def publish_due_posts(session, user_id: int, ig_connection: InstagramConnection) -> None:
+def _fresh_tiktok_token(session, conn: TikTokConnection) -> str:
+    """TikTok access tokens last only 24h (unlike the other platforms' ~60
+    days), so refresh proactively before every publish attempt rather than
+    waiting for a 401."""
+    buffer = dt.timedelta(minutes=5)
+    if conn.token_expires_at and conn.token_expires_at - buffer > dt.datetime.utcnow():
+        return conn.access_token
+
+    resp = httpx.post(
+        "https://open.tiktokapis.com/v2/oauth/token/",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={
+            "client_key": settings.tiktok_client_key,
+            "client_secret": settings.tiktok_client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": conn.refresh_token,
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    conn.access_token = body["access_token"]
+    conn.refresh_token = body.get("refresh_token", conn.refresh_token)
+    conn.token_expires_at = dt.datetime.utcnow() + dt.timedelta(seconds=body.get("expires_in", 24 * 3600))
+    session.commit()
+    logger.info("Refreshed TikTok token for user %s", conn.user_id)
+    return conn.access_token
+
+
+def _publish_to_platform(session, post: Post, platform: str, connections: dict) -> None:
+    """Publishes one post to one platform, writing the outcome to that
+    (post, platform)'s PostPublication row. Failure on one platform never
+    stops the others - each is independent."""
+    pub = (
+        session.query(PostPublication)
+        .filter(PostPublication.post_id == post.id, PostPublication.platform == platform)
+        .first()
+    )
+    if not pub:
+        pub = PostPublication(post_id=post.id, platform=platform)
+        session.add(pub)
+    if pub.status == PublicationStatus.POSTED.value:
+        return  # already succeeded on a prior run - don't double-post
+
+    pub.status = PublicationStatus.PUBLISHING.value
+    session.commit()
+
+    caption = f"{post.caption}\n\n{post.hashtags}".strip()
+    try:
+        if platform == Platform.INSTAGRAM.value:
+            conn: InstagramConnection | None = connections.get("instagram")
+            if not conn or not conn.access_token:
+                raise ValueError("Instagram isn't connected")
+            publisher = InstagramPublisher(conn.ig_user_id, conn.access_token)
+            _, platform_post_id, permalink = publisher.publish_reel(post.video_url, caption, media_type=post.media_type)
+        elif platform == Platform.FACEBOOK.value:
+            conn: FacebookConnection | None = connections.get("facebook")
+            if not conn or not conn.page_id:
+                raise ValueError("Facebook Page isn't connected")
+            publisher = FacebookPublisher(conn.page_id, conn.page_access_token)
+            platform_post_id, permalink = publisher.publish(post.video_url, caption, media_type=post.media_type)
+        elif platform == Platform.LINKEDIN.value:
+            conn: LinkedInConnection | None = connections.get("linkedin")
+            if not conn or not conn.person_id:
+                raise ValueError("LinkedIn isn't connected")
+            # LinkedIn requires direct byte upload, not a hosted URL - use the
+            # local file, not video_url.
+            publisher = LinkedInPublisher(conn.person_id, conn.access_token)
+            platform_post_id, permalink = publisher.publish(post.video_local_path, caption, media_type=post.media_type)
+        elif platform == Platform.TIKTOK.value:
+            conn: TikTokConnection | None = connections.get("tiktok")
+            if not conn or not conn.access_token:
+                raise ValueError("TikTok isn't connected")
+            access_token = _fresh_tiktok_token(session, conn)
+            publisher = TikTokPublisher(access_token)
+            platform_post_id, permalink = publisher.publish(post.video_url, caption, media_type=post.media_type)
+        else:
+            raise ValueError(f"Unknown platform '{platform}'")
+
+        pub.status = PublicationStatus.POSTED.value
+        pub.platform_post_id = platform_post_id
+        pub.permalink = permalink
+        pub.error_message = ""
+        pub.published_at = dt.datetime.utcnow()
+        session.commit()
+        logger.info("Post %s published to %s: %s", post.id, platform, permalink)
+    except Exception as exc:
+        logger.exception("Publishing post %s to %s failed", post.id, platform)
+        pub.status = PublicationStatus.FAILED.value
+        pub.error_message = str(exc)
+        session.commit()
+
+
+def publish_due_posts(session, user_id: int) -> None:
     now = dt.datetime.now()
     due_posts = session.scalars(
         select(Post)
@@ -110,27 +220,44 @@ def publish_due_posts(session, user_id: int, ig_connection: InstagramConnection)
     if not due_posts:
         return
 
-    publisher = InstagramPublisher(ig_connection.ig_user_id, ig_connection.access_token)
+    connections = {
+        "instagram": session.query(InstagramConnection).filter(InstagramConnection.user_id == user_id).first(),
+        "facebook": session.query(FacebookConnection).filter(FacebookConnection.user_id == user_id).first(),
+        "linkedin": session.query(LinkedInConnection).filter(LinkedInConnection.user_id == user_id).first(),
+        "tiktok": session.query(TikTokConnection).filter(TikTokConnection.user_id == user_id).first(),
+    }
 
     for post in due_posts:
+        targets = post.target_platforms or []
+        if not targets:
+            post.status = PostStatus.FAILED.value
+            post.error_message = "No platforms selected to publish this to"
+            session.commit()
+            continue
+
         post.status = PostStatus.PUBLISHING.value
         session.commit()
-        try:
-            caption = f"{post.caption}\n\n{post.hashtags}".strip()
-            creation_id, media_id, permalink = publisher.publish_reel(
-                post.video_url, caption, media_type=post.media_type
-            )
-            post.ig_creation_id = creation_id
-            post.ig_media_id = media_id
-            post.ig_permalink = permalink
+
+        for platform in targets:
+            _publish_to_platform(session, post, platform, connections)
+
+        publications = (
+            session.query(PostPublication)
+            .filter(PostPublication.post_id == post.id, PostPublication.platform.in_(targets))
+            .all()
+        )
+        succeeded = [p.platform for p in publications if p.status == PublicationStatus.POSTED.value]
+        failed = [p.platform for p in publications if p.status == PublicationStatus.FAILED.value]
+        if succeeded and not failed:
             post.status = PostStatus.POSTED.value
-            session.commit()
-            logger.info("Post %s published: %s", post.id, permalink)
-        except InstagramPublishError as exc:
-            logger.exception("Publishing failed for post %s", post.id)
+            post.error_message = ""
+        elif succeeded and failed:
+            post.status = PostStatus.POSTED.value
+            post.error_message = f"Failed on: {', '.join(failed)}"
+        else:
             post.status = PostStatus.FAILED.value
-            post.error_message = str(exc)
-            session.commit()
+            post.error_message = f"Failed on: {', '.join(failed)}" if failed else "Publishing failed"
+        session.commit()
 
 
 def run_once_for_user(user_id: int) -> None:
@@ -157,14 +284,8 @@ def run_once_for_user(user_id: int) -> None:
         else:
             summary_parts.append("Skipped AI generation - brand profile not set up yet")
 
-        ig_connection = (
-            session.query(InstagramConnection).filter(InstagramConnection.user_id == user_id).first()
-        )
-        if ig_connection and ig_connection.access_token:
-            publish_due_posts(session, user_id, ig_connection)
-            summary_parts.append("Checked for due posts to publish")
-        else:
-            summary_parts.append("Skipped publishing - Instagram not connected")
+        publish_due_posts(session, user_id)
+        summary_parts.append("Checked for due posts to publish")
 
         run.status = "ok"
         run.summary = "; ".join(summary_parts)

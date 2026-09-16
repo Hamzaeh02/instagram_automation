@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { Calendar as CalendarIcon, Check, Film, Image as ImageIcon, UploadCloud, X } from "lucide-react"
+import { Calendar as CalendarIcon, Check, ChevronRight, Film, Image as ImageIcon, UploadCloud, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { Link } from "react-router-dom"
 import { api, ApiError } from "../api/client"
 import { Button, Card, FadeIn, FieldLabelRow, Input, Label, PageHeader, Textarea } from "../components/ui"
 import { AiImproveButton } from "../components/AiImproveButton"
@@ -240,23 +241,26 @@ export function Upload() {
         ) : (
           <div className="space-y-2">
             {recent.map((p) => (
-              <Card key={p.id} className="flex items-center gap-4 py-3.5">
-                {p.media_type === "REELS" ? (
-                  <Film className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
-                ) : (
-                  <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{p.title}</div>
-                  <div className="text-xs text-[var(--color-text-faint)]">
-                    {new Date(p.scheduled_at).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
+              <Link key={p.id} to={`/posts/${p.id}`}>
+                <Card className="flex items-center gap-4 py-3.5 transition-colors hover:border-[var(--color-border-strong)]">
+                  {p.media_type === "REELS" ? (
+                    <Film className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{p.title}</div>
+                    <div className="text-xs text-[var(--color-text-faint)]">
+                      {new Date(p.scheduled_at).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </div>
                   </div>
-                </div>
-                <StatusBadge status={p.status} />
-              </Card>
+                  <StatusBadge status={p.status} />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                </Card>
+              </Link>
             ))}
           </div>
         )}

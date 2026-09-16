@@ -26,6 +26,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // ignore
     }
+    // A 401 anywhere but the auth endpoints themselves means the session
+    // cookie expired or was invalidated mid-use - every page up to now had
+    // no way to detect this, so API calls would just silently fail one by
+    // one while the UI kept acting like the user was still logged in. Send
+    // them back to login instead of leaving every page broken in place.
+    if (res.status === 401 && !path.startsWith("/auth/")) {
+      window.location.href = "/login"
+    }
     throw new ApiError(res.status, detail)
   }
 

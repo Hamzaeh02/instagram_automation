@@ -39,11 +39,39 @@ class Settings:
 
     meta_app_id: str = _env_str("META_APP_ID")
     meta_app_secret: str = _env_str("META_APP_SECRET")
-    # Instagram API with Instagram Login (graph.instagram.com) - no Facebook Page needed.
-    # Per-user access tokens live in the InstagramConnection DB table, not here -
-    # meta_app_id/secret are the platform's own app, used for the OAuth connect flow.
+
+    # Instagram Business Login uses a *different* App ID/Secret than the main
+    # Meta app - found in App Dashboard > Instagram > API setup with
+    # Instagram login > "3. Set up Instagram business login" > Business
+    # login settings. Using meta_app_id/secret here fails with "Invalid
+    # platform app" - that pair is for Facebook Login (below), not this.
+    instagram_app_id: str = _env_str("INSTAGRAM_APP_ID")
+    instagram_app_secret: str = _env_str("INSTAGRAM_APP_SECRET")
     instagram_graph_api_version: str = _env_str("INSTAGRAM_GRAPH_API_VERSION", "v25.0")
     instagram_oauth_redirect_uri: str = _env_str("INSTAGRAM_OAUTH_REDIRECT_URI")
+
+    # Facebook Page publishing uses the main Meta app id/secret above (regular
+    # Facebook Login, not Instagram Business Login) - just a different OAuth
+    # scope set and a Page access token instead of an IG user token.
+    facebook_graph_api_version: str = _env_str("FACEBOOK_GRAPH_API_VERSION", "v25.0")
+    facebook_oauth_redirect_uri: str = _env_str("FACEBOOK_OAUTH_REDIRECT_URI")
+
+    # LinkedIn is a separate developer app (own client id/secret) - posts to
+    # the connecting member's own profile (w_member_social via "Share on
+    # LinkedIn", self-serve). Company Page posting needs Community Management
+    # API, which requires LinkedIn's review, so it's intentionally not built.
+    linkedin_client_id: str = _env_str("LINKEDIN_CLIENT_ID")
+    linkedin_client_secret: str = _env_str("LINKEDIN_CLIENT_SECRET")
+    linkedin_oauth_redirect_uri: str = _env_str("LINKEDIN_OAUTH_REDIRECT_URI")
+    linkedin_api_version: str = _env_str("LINKEDIN_API_VERSION", "202608")
+
+    # TikTok - self-serve app creation and connect/post work immediately, but
+    # until the app passes TikTok's audit, every post is forced to SELF_ONLY
+    # (private) visibility server-side - that's enforced by TikTok, not
+    # something this app's code controls.
+    tiktok_client_key: str = _env_str("TIKTOK_CLIENT_KEY")
+    tiktok_client_secret: str = _env_str("TIKTOK_CLIENT_SECRET")
+    tiktok_oauth_redirect_uri: str = _env_str("TIKTOK_OAUTH_REDIRECT_URI")
 
     storage_endpoint_url: str = _env_str("STORAGE_ENDPOINT_URL")
     storage_bucket: str = _env_str("STORAGE_BUCKET")

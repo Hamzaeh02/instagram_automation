@@ -9,6 +9,7 @@ from sqlalchemy import select
 from api.auth import require_auth
 from api.routes_brand import get_profile
 from common.logging import get_logger
+from common.timeutil import utc_iso
 from db.models import RunLog, User
 from db.session import get_session
 from orchestrator.daily import run_once_for_user
@@ -107,8 +108,8 @@ def get_activity(limit: int = 20, user: User = Depends(require_auth)):
             "runs": [
                 {
                     "id": r.id,
-                    "started_at": r.started_at.isoformat(),
-                    "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+                    "started_at": utc_iso(r.started_at),
+                    "finished_at": utc_iso(r.finished_at),
                     "status": r.status,
                     "summary": r.summary,
                     "error": r.error,

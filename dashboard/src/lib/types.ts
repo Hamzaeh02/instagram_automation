@@ -11,6 +11,16 @@ export type PostStatus =
 
 export type PostSource = "ai_generated" | "user_uploaded"
 
+export type Platform = "instagram" | "facebook" | "linkedin" | "tiktok"
+
+export interface PostPublication {
+  platform: Platform
+  status: "pending" | "publishing" | "posted" | "failed"
+  permalink: string
+  error_message: string
+  published_at: string | null
+}
+
 export interface Post {
   id: number
   source: PostSource
@@ -25,13 +35,14 @@ export interface Post {
   hashtags: string
   title: string
   broll_keywords: string
+  target_platforms: Platform[]
+  publications: PostPublication[]
   status: PostStatus
   retry_count: number
   reject_reason: string
   error_message: string
   has_video: boolean
   video_url: string
-  ig_permalink: string
   created_at: string
   updated_at: string
 }
