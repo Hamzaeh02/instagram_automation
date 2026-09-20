@@ -183,20 +183,29 @@ export function Dashboard() {
               </p>
             )}
             {activity && activity.length > 0 && (
-              <div className="relative ml-1.5 space-y-6 border-l-2 border-[var(--color-border)] pl-6">
-                {activity.map((run) => (
-                  <div key={run.id} className="relative">
-                    <span
-                      className={
-                        "absolute -left-[29px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--color-bg-elevated)] " +
-                        (run.status === "ok"
-                          ? "bg-[var(--color-success)]"
-                          : run.status === "error"
-                            ? "bg-[var(--color-danger)]"
-                            : "bg-[var(--color-warning)]")
-                      }
-                    />
-                    <div className="flex items-start gap-2">
+              <div>
+                {activity.map((run, i) => (
+                  <div key={run.id} className="flex gap-3">
+                    {/* Rail: dot + connector, sized per-row so the line only
+                        ever spans between two real dots - it can't dangle
+                        past the last item the way a container-wide border
+                        would. */}
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={
+                          "mt-0.5 h-3 w-3 shrink-0 rounded-full border-2 border-[var(--color-bg-elevated)] " +
+                          (run.status === "ok"
+                            ? "bg-[var(--color-success)]"
+                            : run.status === "error"
+                              ? "bg-[var(--color-danger)]"
+                              : "bg-[var(--color-warning)]")
+                        }
+                      />
+                      {i < activity.length - 1 && (
+                        <span className="my-1 w-0.5 flex-1 bg-[var(--color-border)]" />
+                      )}
+                    </div>
+                    <div className="flex items-start gap-2 pb-6">
                       <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
                       <div className="min-w-0">
                         <div className="text-sm text-[var(--color-text)]">{run.summary || run.error || "Running…"}</div>
