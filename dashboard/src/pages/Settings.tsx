@@ -267,7 +267,7 @@ export function Settings() {
           )}
 
           {section === "account" && (
-            <div className="panel-flat glass-card">
+            <div className="panel-flat glass-card p-6">
               <div className="mb-3 flex items-center gap-2">
                 <UserCircle className="h-5 w-5 text-[var(--color-primary)]" />
                 <h3 className="font-[var(--font-display)] font-bold">Account</h3>
@@ -285,7 +285,7 @@ export function Settings() {
                 <Spinner className="h-5 w-5 text-[var(--color-text-faint)]" />
               </div>
             ) : (
-              <div className="panel-flat glass-card space-y-5">
+              <div className="panel-flat glass-card p-6 space-y-5">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <Label>Brand name</Label>

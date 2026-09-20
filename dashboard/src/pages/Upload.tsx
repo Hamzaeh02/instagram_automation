@@ -188,7 +188,7 @@ export function Upload() {
             )}
 
             {step === 1 && (
-              <div className="glass-card space-y-5">
+              <div className="glass-card p-6 space-y-5">
                 <div>
                   <FieldLabelRow
                     label="Title (internal only)"
@@ -233,7 +233,7 @@ export function Upload() {
             )}
 
             {step === 2 && (
-              <div className="glass-card space-y-5">
+              <div className="glass-card p-6 space-y-5">
                 <div>
                   <Label>Publish on</Label>
                   <div className="relative">
@@ -294,7 +294,7 @@ export function Upload() {
         {recent === null ? (
           <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
         ) : recent.length === 0 ? (
-          <div className="glass-card py-10 text-center text-sm text-[var(--color-text-muted)]">
+          <div className="glass-card px-4 py-10 text-center text-sm text-[var(--color-text-muted)]">
             Nothing uploaded yet — add your first post above.
           </div>
         ) : (

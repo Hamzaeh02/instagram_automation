@@ -289,7 +289,7 @@ export function Calendar() {
               {selectedDay.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
             </h3>
             {dayPosts.length === 0 ? (
-              <div className="glass-card panel-strip py-8 text-center text-sm text-[var(--color-text-muted)]">
+              <div className="glass-card panel-strip px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
                 Nothing scheduled this day.
               </div>
             ) : (
