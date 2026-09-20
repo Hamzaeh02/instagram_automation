@@ -17,7 +17,6 @@ const Onboarding = lazy(() => import("./pages/Onboarding").then((m) => ({ defaul
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })))
 const Calendar = lazy(() => import("./pages/Calendar").then((m) => ({ default: m.Calendar })))
 const Upload = lazy(() => import("./pages/Upload").then((m) => ({ default: m.Upload })))
-const Create = lazy(() => import("./pages/Create").then((m) => ({ default: m.Create })))
 const PostDetail = lazy(() => import("./pages/PostDetail").then((m) => ({ default: m.PostDetail })))
 const Settings = lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })))
 
@@ -93,7 +92,6 @@ function AuthedApp() {
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/upload" element={<Upload />} />
-                  <Route path="/create" element={<Create />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/posts/:id" element={<PostDetail />} />
                   <Route path="/settings" element={<Settings />} />

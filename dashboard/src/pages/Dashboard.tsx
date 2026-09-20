@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { Briefcase, Camera, Check, ClipboardCheck, Globe, Music2, PlayCircle, UploadCloud, Wand2, CalendarDays, Zap, XCircle } from "lucide-react"
+import { Briefcase, Camera, Check, ClipboardCheck, Globe, Music2, PlayCircle, UploadCloud, CalendarDays, Zap, XCircle } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/client"
@@ -98,7 +98,6 @@ export function Dashboard() {
 
   const quickLinks = [
     { to: "/upload", label: "Upload content", icon: UploadCloud },
-    { to: "/create", label: "Create with AI", icon: Wand2 },
     { to: "/calendar", label: "Open calendar", icon: CalendarDays },
   ]
 

@@ -61,9 +61,9 @@ export function PostDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // While a post is still being written/generated (e.g. just triggered from
-  // "Create with AI"), poll for progress instead of leaving the page frozen
-  // on a stale "generating" state - stops itself once it leaves that phase.
+  // While a post is still being written/generated, poll for progress instead
+  // of leaving the page frozen on a stale "generating" state - stops itself
+  // once it leaves that phase.
   // Keyed on `id` too (not just status): navigating directly between two
   // posts that happen to share the same in-progress status string wouldn't
   // otherwise restart this effect, leaving it polling the previous post.

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import { LayoutDashboard, CalendarDays, Settings, LogOut, Zap, UploadCloud, Wand2 } from "lucide-react"
+import { LayoutDashboard, CalendarDays, Settings, LogOut, Zap, UploadCloud } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import type { ReactNode } from "react"
 import { useAuth } from "../lib/auth"
@@ -8,7 +8,6 @@ const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/upload", label: "Upload", icon: UploadCloud },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/create", label: "Create with AI", icon: Wand2 },
   { to: "/settings", label: "Settings", icon: Settings },
 ]
 
