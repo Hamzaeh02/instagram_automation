@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { Briefcase, Camera, Check, ClipboardCheck, Globe, Music2, PlayCircle, XCircle, Zap } from "lucide-react"
+import { Briefcase, Camera, Check, ClipboardCheck, Globe, Music2, PlayCircle, UploadCloud, Wand2, CalendarDays, Zap, XCircle } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api } from "../api/client"
-import { Button, Card, FadeIn, PageHeader, Spinner } from "../components/ui"
+import { Button, FadeIn, PageHeader, Spinner } from "../components/ui"
+import { TiltCard } from "../components/TiltCard"
 import { StatusBadge } from "../components/StatusBadge"
 import type { BrandProfile, Post, RunLogEntry } from "../lib/types"
 
@@ -35,7 +36,7 @@ export function Dashboard() {
       api.get<PlatformStatus>("/tiktok/status"),
       api.get<{ brand: BrandProfile | null }>("/brand"),
       api.get<{ posts: Post[] }>("/posts?limit=8"),
-      api.get<{ runs: RunLogEntry[] }>("/activity?limit=5"),
+      api.get<{ runs: RunLogEntry[] }>("/activity?limit=6"),
     ])
     setIg(igRes)
     setFb(fbRes)
@@ -87,42 +88,18 @@ export function Dashboard() {
   const brandReady = Boolean(brand?.brand_name && brand?.niche)
   const running = runState?.status === "running"
 
-  const cards = [
-    {
-      key: "instagram",
-      label: "Instagram",
-      icon: Camera,
-      ok: Boolean(ig?.connected),
-      detail: ig?.connected ? "Connected" : "Not connected",
-    },
-    {
-      key: "facebook",
-      label: "Facebook",
-      icon: Globe,
-      ok: Boolean(fb?.connected && !fb.needs_page),
-      detail: fb?.connected && !fb.needs_page ? "Connected" : fb?.connected && fb.needs_page ? "Pick a Page" : "Not connected",
-    },
-    {
-      key: "linkedin",
-      label: "LinkedIn",
-      icon: Briefcase,
-      ok: Boolean(li?.connected),
-      detail: li?.connected ? "Connected" : "Not connected",
-    },
-    {
-      key: "tiktok",
-      label: "TikTok",
-      icon: Music2,
-      ok: Boolean(tt?.connected),
-      detail: tt?.connected ? "Connected" : "Not connected",
-    },
-    {
-      key: "brand",
-      label: "Brand profile",
-      icon: ClipboardCheck,
-      ok: brandReady,
-      detail: brandReady ? "Complete" : "Incomplete",
-    },
+  const statuses = [
+    { key: "instagram", label: "Instagram", icon: Camera, ok: Boolean(ig?.connected) },
+    { key: "facebook", label: "Facebook", icon: Globe, ok: Boolean(fb?.connected && !fb.needs_page) },
+    { key: "linkedin", label: "LinkedIn", icon: Briefcase, ok: Boolean(li?.connected) },
+    { key: "tiktok", label: "TikTok", icon: Music2, ok: Boolean(tt?.connected) },
+    { key: "brand", label: "Brand profile", icon: ClipboardCheck, ok: brandReady },
+  ]
+
+  const quickLinks = [
+    { to: "/upload", label: "Upload content", icon: UploadCloud },
+    { to: "/create", label: "Create with AI", icon: Wand2 },
+    { to: "/calendar", label: "Open calendar", icon: CalendarDays },
   ]
 
   return (
@@ -139,6 +116,21 @@ export function Dashboard() {
         }
       />
 
+      {/* Status strip: every connection state in one horizontal bar instead
+          of a grid of separate cards. */}
+      <div className="mb-8 flex flex-wrap items-center gap-2 rounded-md border-2 border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 py-3">
+        {statuses.map((s) => (
+          <div
+            key={s.key}
+            className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-black/20 px-3 py-1.5"
+          >
+            <s.icon className="h-3.5 w-3.5 text-[var(--color-text-muted)]" strokeWidth={2} />
+            <span className="text-xs font-semibold">{s.label}</span>
+            <span className={"h-1.5 w-1.5 rounded-full " + (s.ok ? "bg-[var(--color-success)]" : "bg-[var(--color-warning)]")} />
+          </div>
+        ))}
+      </div>
+
       <AnimatePresence>
         {runState && (
           <FadeIn>
@@ -147,12 +139,12 @@ export function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={
-                "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
+                "mb-6 flex items-center gap-2.5 rounded-md border-2 px-4 py-3 text-sm " +
                 (runState.status === "running"
                   ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                    : "border-rose-500/30 bg-rose-500/10 text-rose-300")
+                    ? "border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]"
+                    : "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--color-danger)]")
               }
             >
               {runState.status === "running" ? (
@@ -174,51 +166,76 @@ export function Dashboard() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {cards.map((c, i) => (
-          <FadeIn key={c.key} delay={i * 0.05}>
-            <Card className="p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <c.icon className="h-5 w-5 text-[var(--color-text-muted)]" strokeWidth={1.75} />
-                <span className={"h-2 w-2 rounded-full " + (c.ok ? "bg-emerald-400" : "bg-amber-400")} />
-              </div>
-              <div className="text-sm font-semibold">{c.label}</div>
-              <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{c.detail}</div>
-            </Card>
-          </FadeIn>
-        ))}
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-5">
+      {/* Asymmetric body: a tall activity timeline on the left, a stacked
+          "up next" queue + quick-action tiles rail on the right — replaces
+          the old two-cards-side-by-side pattern entirely. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <FadeIn delay={0.1} className="lg:col-span-3">
-          <Card className="p-0">
-            <div className="flex items-center justify-between px-6 py-5">
-              <h3 className="font-[var(--font-display)] font-bold">Up next</h3>
-              <Link to="/calendar" className="text-xs font-medium text-[var(--color-primary)] hover:underline">
-                View calendar →
-              </Link>
-            </div>
-            <div className="divide-y divide-[var(--color-border)]">
-              {posts === null && (
-                <div className="flex justify-center py-10">
-                  <Spinner className="h-5 w-5 text-[var(--color-text-faint)]" />
-                </div>
-              )}
-              {posts?.length === 0 && (
-                <p className="px-6 py-8 text-sm text-[var(--color-text-muted)]">
-                  No posts planned yet — upload content or generate your calendar to get started.
-                </p>
-              )}
-              {posts?.map((p, i) => (
-                <motion.div
-                  key={p.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.04 }}
-                >
+          <div className="glass-card p-6">
+            <h3 className="mb-5 font-[var(--font-display)] font-bold">Activity timeline</h3>
+            {activity === null && (
+              <div className="flex justify-center py-10">
+                <Spinner className="h-5 w-5 text-[var(--color-text-faint)]" />
+              </div>
+            )}
+            {activity?.length === 0 && (
+              <p className="text-sm text-[var(--color-text-muted)]">
+                No automation runs yet. Trigger one above, or wait for the daily schedule.
+              </p>
+            )}
+            {activity && activity.length > 0 && (
+              <div className="relative ml-1.5 space-y-6 border-l-2 border-[var(--color-border)] pl-6">
+                {activity.map((run) => (
+                  <div key={run.id} className="relative">
+                    <span
+                      className={
+                        "absolute -left-[29px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--color-bg-elevated)] " +
+                        (run.status === "ok"
+                          ? "bg-[var(--color-success)]"
+                          : run.status === "error"
+                            ? "bg-[var(--color-danger)]"
+                            : "bg-[var(--color-warning)]")
+                      }
+                    />
+                    <div className="flex items-start gap-2">
+                      <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                      <div className="min-w-0">
+                        <div className="text-sm text-[var(--color-text)]">{run.summary || run.error || "Running…"}</div>
+                        <div className="text-xs text-[var(--color-text-faint)]">
+                          {new Date(run.started_at).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </FadeIn>
+
+        <div className="space-y-5 lg:col-span-2">
+          <FadeIn delay={0.15}>
+            <div className="glass-card p-0">
+              <div className="flex items-center justify-between px-5 py-4">
+                <h3 className="font-[var(--font-display)] text-sm font-bold">Up next</h3>
+                <Link to="/calendar" className="text-xs font-medium text-[var(--color-primary)] hover:underline">
+                  Calendar →
+                </Link>
+              </div>
+              <div className="divide-y-2 divide-[var(--color-border)]">
+                {posts === null && (
+                  <div className="flex justify-center py-8">
+                    <Spinner className="h-4 w-4 text-[var(--color-text-faint)]" />
+                  </div>
+                )}
+                {posts?.length === 0 && (
+                  <p className="px-5 py-6 text-sm text-[var(--color-text-muted)]">Nothing planned yet.</p>
+                )}
+                {posts?.slice(0, 4).map((p) => (
                   <Link
+                    key={p.id}
                     to={`/posts/${p.id}`}
-                    className="flex items-center justify-between gap-4 px-6 py-3.5 transition hover:bg-white/[0.03]"
+                    className="flex items-center justify-between gap-3 px-5 py-3 transition hover:bg-white/[0.03]"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{p.title || "Untitled"}</div>
@@ -228,59 +245,34 @@ export function Dashboard() {
                           day: "numeric",
                           hour: "numeric",
                           minute: "2-digit",
-                        })}{" "}
-                        · {p.pillar || p.source}
+                        })}
                       </div>
                     </div>
                     <StatusBadge status={p.status} />
                   </Link>
-                </motion.div>
-              ))}
+                ))}
+              </div>
             </div>
-          </Card>
-        </FadeIn>
+          </FadeIn>
 
-        <FadeIn delay={0.15} className="lg:col-span-2">
-          <Card className="p-0">
-            <div className="px-6 py-5">
-              <h3 className="font-[var(--font-display)] font-bold">Recent activity</h3>
-            </div>
-            <div className="divide-y divide-[var(--color-border)]">
-              {activity === null && (
-                <div className="flex justify-center py-10">
-                  <Spinner className="h-5 w-5 text-[var(--color-text-faint)]" />
-                </div>
-              )}
-              {activity?.length === 0 && (
-                <p className="px-6 py-8 text-sm text-[var(--color-text-muted)]">
-                  No automation runs yet. Trigger one above, or wait for the daily schedule.
-                </p>
-              )}
-              {activity?.map((run) => (
-                <div key={run.id} className="flex items-start gap-3 px-6 py-3.5">
-                  <PlayCircle
-                    className={
-                      "mt-0.5 h-4 w-4 shrink-0 " +
-                      (run.status === "ok"
-                        ? "text-emerald-400"
-                        : run.status === "error"
-                          ? "text-rose-400"
-                          : "text-amber-400")
-                    }
-                  />
-                  <div className="min-w-0">
-                    <div className="text-sm text-[var(--color-text)]">
-                      {run.summary || run.error || "Running…"}
-                    </div>
-                    <div className="text-xs text-[var(--color-text-faint)]">
-                      {new Date(run.started_at).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </FadeIn>
+          <FadeIn delay={0.2}>
+            <TiltCard className="!p-4">
+              <h3 className="mb-3 font-[var(--font-display)] text-sm font-bold">Quick actions</h3>
+              <div className="space-y-2">
+                {quickLinks.map((q) => (
+                  <Link
+                    key={q.to}
+                    to={q.to}
+                    className="flex items-center gap-2.5 rounded-md border-2 border-[var(--color-border)] px-3 py-2.5 text-sm font-semibold transition hover:border-[var(--color-primary)] hover:bg-white/[0.03]"
+                  >
+                    <q.icon className="h-4 w-4 text-[var(--color-primary)]" />
+                    {q.label}
+                  </Link>
+                ))}
+              </div>
+            </TiltCard>
+          </FadeIn>
+        </div>
       </div>
     </div>
   )

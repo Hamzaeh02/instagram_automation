@@ -20,11 +20,13 @@ const PLATFORM_META: Record<Platform, { label: string; icon: typeof Camera }> = 
   tiktok: { label: "TikTok", icon: Music2 },
 }
 const ALL_PLATFORMS: Platform[] = ["instagram", "facebook", "linkedin", "tiktok"]
+const TABS = ["Content", "Publishing"] as const
 
 export function PostDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [post, setPost] = useState<Post | null>(null)
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Content")
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showReject, setShowReject] = useState(false)
@@ -173,33 +175,54 @@ export function PostDetail() {
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      {/* Header bar: title + every primary action up front, instead of
+          buried at the bottom of a long stacked form. */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-md border-2 border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 py-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-[var(--font-display)] text-2xl font-bold">{post.title || "Untitled"}</h1>
+            <h1 className="font-[var(--font-display)] text-xl font-bold">{post.title || "Untitled"}</h1>
             <StatusBadge status={post.status} />
           </div>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {new Date(post.scheduled_at).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}{" "}
-            · {post.pillar}
+            {new Date(post.scheduled_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ·{" "}
+            {post.pillar}
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {dirty && (
+            <Button variant="outline" onClick={save} disabled={saving}>
+              <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
+            </Button>
+          )}
+          {(post.status === "pending_review" || post.status === "needs_manual_edit") && (
+            <>
+              <Button onClick={approve} disabled={busy}>
+                <Check className="h-4 w-4" /> Approve
+              </Button>
+              <Button variant="danger" onClick={() => setShowReject(true)} disabled={busy}>
+                <X className="h-4 w-4" /> Reject
+              </Button>
+            </>
+          )}
+          {post.status !== "posted" && post.status !== "publishing" && (
+            <Button variant="danger" onClick={() => setShowDelete(true)} disabled={busy}>
+              <Trash2 className="h-4 w-4" /> Delete
+            </Button>
+          )}
         </div>
       </div>
 
       {post.error_message && (
         <FadeIn>
-          <Card className="mb-6 border-rose-500/30 bg-rose-500/5 py-4">
-            <p className="text-sm text-rose-300">{post.error_message}</p>
+          <Card className="mb-6 border-[var(--color-danger)]/40 bg-[var(--color-danger)]/5 py-4">
+            <p className="text-sm text-[var(--color-danger)]">{post.error_message}</p>
           </Card>
         </FadeIn>
       )}
       {post.reject_reason && (
         <FadeIn>
-          <Card className="mb-6 border-amber-500/30 bg-amber-500/5 py-4">
-            <p className="text-sm text-amber-300">
+          <Card className="mb-6 border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5 py-4">
+            <p className="text-sm text-[var(--color-warning)]">
               <span className="font-semibold">Last rejection:</span> {post.reject_reason}
               {post.retry_count > 0 && ` (attempt ${post.retry_count})`}
             </p>
@@ -207,39 +230,94 @@ export function PostDetail() {
         </FadeIn>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <FadeIn className="lg:col-span-2">
-          <Card className="panel-ribbon overflow-hidden p-0">
-            {post.has_video && post.media_type === "IMAGE" ? (
-              <img className="aspect-[9/16] w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
-            ) : post.has_video ? (
-              <video controls className="aspect-[9/16] w-full bg-black" src={`/api/posts/${post.id}/video`} />
-            ) : post.status === "planned" || post.status === "video_generating" || post.status === "image_generating" ? (
-              <GeneratingPanel status={post.status} />
-            ) : (
-              <div className="flex aspect-[9/16] w-full items-center justify-center text-sm text-[var(--color-text-faint)]">
-                No video for this post
-              </div>
-            )}
-          </Card>
+      {actionError && (
+        <FadeIn>
+          <p className="mb-4 text-sm text-[var(--color-danger)]">{actionError}</p>
         </FadeIn>
+      )}
 
-        <FadeIn delay={0.05} className="space-y-5 lg:col-span-3">
-          <Card>
+      {/* Media as a full-width top banner instead of a dominant side column. */}
+      <div className="panel-ribbon glass-card mb-6 overflow-hidden p-0">
+        {post.has_video && post.media_type === "IMAGE" ? (
+          <img className="h-72 w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
+        ) : post.has_video ? (
+          <video controls className="h-72 w-full bg-black" src={`/api/posts/${post.id}/video`} />
+        ) : post.status === "planned" || post.status === "video_generating" || post.status === "image_generating" ? (
+          <GeneratingPanel status={post.status} />
+        ) : (
+          <div className="flex h-40 w-full items-center justify-center text-sm text-[var(--color-text-faint)]">
+            No video for this post
+          </div>
+        )}
+      </div>
+
+      <div className="mb-5 flex gap-1 border-b-2 border-[var(--color-border)]">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={
+              "-mb-0.5 border-b-2 px-4 py-2.5 text-sm font-semibold transition " +
+              (tab === t
+                ? "border-[var(--color-primary)] text-[var(--color-text)]"
+                : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]")
+            }
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === "Content" && (
+        <div className="max-w-3xl space-y-5">
+          <div>
             <Label>Title</Label>
             <Input value={post.title} onChange={(e) => update("title", e.target.value)} />
-          </Card>
+          </div>
+          <div>
+            <Label>Caption</Label>
+            <Textarea rows={4} value={post.caption} onChange={(e) => update("caption", e.target.value)} />
+          </div>
+          <div>
+            <Label>Hashtags</Label>
+            <Textarea rows={2} value={post.hashtags} onChange={(e) => update("hashtags", e.target.value)} />
+          </div>
 
-          <Card>
+          {post.source === "ai_generated" && post.media_type === "REELS" && (
+            <>
+              <div>
+                <Label>Voiceover script</Label>
+                <Textarea rows={5} value={post.script} onChange={(e) => update("script", e.target.value)} />
+              </div>
+              <div>
+                <Label>B-roll keywords</Label>
+                <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
+              </div>
+            </>
+          )}
+
+          {post.source === "ai_generated" && post.media_type === "IMAGE" && (
+            <div>
+              <Label>Stock photo keywords</Label>
+              <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
+              <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">What the stock photo was searched for.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "Publishing" && (
+        <div className="max-w-3xl space-y-5">
+          <div>
             <Label>Posting date & time</Label>
             <Input
               type="datetime-local"
               value={toDatetimeLocal(post.scheduled_at)}
               onChange={(e) => update("scheduled_at", e.target.value)}
             />
-          </Card>
+          </div>
 
-          <Card>
+          <div>
             <Label>Publish to</Label>
             <div className="flex flex-wrap gap-2">
               {ALL_PLATFORMS.map((platform) => {
@@ -254,7 +332,7 @@ export function PostDetail() {
                     onClick={() => togglePlatform(platform)}
                     title={isConnected ? undefined : `Connect ${meta.label} in Settings first`}
                     className={
-                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition " +
+                      "flex items-center gap-1.5 rounded-md border-2 px-3 py-1.5 text-xs font-medium transition " +
                       (!isConnected
                         ? "cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-faint)] opacity-50"
                         : isSelected
@@ -269,8 +347,12 @@ export function PostDetail() {
                 )
               })}
             </div>
-            {post.publications.length > 0 && (
-              <div className="mt-4 space-y-1.5 border-t border-[var(--color-border)] pt-3">
+          </div>
+
+          {post.publications.length > 0 && (
+            <div>
+              <Label>Publish history</Label>
+              <div className="space-y-1.5 rounded-md border-2 border-[var(--color-border)] p-4">
                 {post.publications.map((pub) => {
                   const meta = PLATFORM_META[pub.platform]
                   return (
@@ -287,7 +369,7 @@ export function PostDetail() {
                           Posted <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : pub.status === "failed" ? (
-                        <span className="text-rose-400">Failed{pub.error_message ? `: ${pub.error_message}` : ""}</span>
+                        <span className="text-[var(--color-danger)]">Failed{pub.error_message ? `: ${pub.error_message}` : ""}</span>
                       ) : (
                         <span className="text-[var(--color-text-faint)] capitalize">{pub.status}</span>
                       )}
@@ -295,75 +377,10 @@ export function PostDetail() {
                   )
                 })}
               </div>
-            )}
-          </Card>
-
-          <Card>
-            <Label>Caption</Label>
-            <Textarea rows={4} value={post.caption} onChange={(e) => update("caption", e.target.value)} />
-          </Card>
-
-          <Card>
-            <Label>Hashtags</Label>
-            <Textarea rows={2} value={post.hashtags} onChange={(e) => update("hashtags", e.target.value)} />
-          </Card>
-
-          {post.source === "ai_generated" && post.media_type === "REELS" && (
-            <>
-              <Card>
-                <Label>Voiceover script</Label>
-                <Textarea rows={5} value={post.script} onChange={(e) => update("script", e.target.value)} />
-              </Card>
-
-              <Card>
-                <Label>B-roll keywords</Label>
-                <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
-              </Card>
-            </>
+            </div>
           )}
-
-          {post.source === "ai_generated" && post.media_type === "IMAGE" && (
-            <Card>
-              <Label>Stock photo keywords</Label>
-              <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
-              <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
-                What the stock photo was searched for.
-              </p>
-            </Card>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3">
-            {dirty && (
-              <Button variant="outline" onClick={save} disabled={saving}>
-                <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save changes"}
-              </Button>
-            )}
-
-            {(post.status === "pending_review" || post.status === "needs_manual_edit") && (
-              <>
-                <Button onClick={approve} disabled={busy}>
-                  <Check className="h-4 w-4" /> Approve
-                </Button>
-                <Button variant="danger" onClick={() => setShowReject(true)} disabled={busy}>
-                  <X className="h-4 w-4" /> Reject
-                </Button>
-              </>
-            )}
-
-            {post.status !== "posted" && post.status !== "publishing" && (
-              <Button variant="danger" onClick={() => setShowDelete(true)} disabled={busy} className="ml-auto">
-                <Trash2 className="h-4 w-4" /> Delete
-              </Button>
-            )}
-          </div>
-
-          {actionError && (
-            <FadeIn>
-              <p className="text-sm text-rose-400">{actionError}</p>
-            </FadeIn>
-          )}
-        </FadeIn>
-      </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {showReject && (
@@ -456,11 +473,11 @@ function GeneratingPanel({ status }: { status: "planned" | "video_generating" | 
       ? "Searching stock photos for a match — usually just a few seconds."
       : "Voiceover, footage, and captions are being put together — usually a minute or two."
   return (
-    <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-5 p-8 text-center">
+    <div className="flex h-72 w-full flex-col items-center justify-center gap-5 p-8 text-center">
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-        className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)] border-2 border-[var(--color-border-strong)]"
+        className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-[var(--color-border-strong)] bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)]"
       >
         <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
       </motion.div>

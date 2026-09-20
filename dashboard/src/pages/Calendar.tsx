@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { CalendarPlus, Check, ChevronRight, Film, Image as ImageIcon, Sparkles, XCircle } from "lucide-react"
+import { CalendarPlus, Check, ChevronLeft, ChevronRight, Film, Image as ImageIcon, Sparkles, XCircle } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api, ApiError } from "../api/client"
@@ -24,6 +24,11 @@ const MEDIA_FILTERS: { label: string; value: "all" | "REELS" | "IMAGE"; icon: ty
 
 const POLL_MS = 3000
 const POLL_TIMEOUT_MS = 5 * 60 * 1000
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+function dayKey(d: Date) {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
 
 export function Calendar() {
   const [posts, setPosts] = useState<Post[] | null>(null)
@@ -31,6 +36,11 @@ export function Calendar() {
   const [mediaFilter, setMediaFilter] = useState<"all" | "REELS" | "IMAGE">("all")
   const [showGenerate, setShowGenerate] = useState(false)
   const [runState, setRunState] = useState<{ status: "running" | "done" | "error"; message?: string } | null>(null)
+  const [month, setMonth] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+  const [selectedDay, setSelectedDay] = useState<Date>(() => new Date())
   const pollRef = useRef<number | null>(null)
 
   async function load() {
@@ -80,24 +90,36 @@ export function Calendar() {
       .filter((p) => mediaFilter === "all" || p.media_type === mediaFilter)
   }, [posts, statusFilter, mediaFilter])
 
-  const grouped = useMemo(() => {
-    const groups = new Map<string, Post[]>()
+  const byDay = useMemo(() => {
+    const map = new Map<string, Post[]>()
     for (const post of filtered) {
-      const month = new Date(post.scheduled_at).toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-      })
-      if (!groups.has(month)) groups.set(month, [])
-      groups.get(month)!.push(post)
+      const key = dayKey(new Date(post.scheduled_at))
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(post)
     }
-    return Array.from(groups.entries())
+    return map
   }, [filtered])
+
+  const grid = useMemo(() => {
+    const firstWeekday = month.getDay()
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+    const cells: (Date | null)[] = []
+    for (let i = 0; i < firstWeekday; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d))
+    while (cells.length % 7 !== 0) cells.push(null)
+    return cells
+  }, [month])
+
+  const dayPosts = (byDay.get(dayKey(selectedDay)) ?? []).sort(
+    (a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime(),
+  )
+  const today = new Date()
 
   return (
     <div className="section-calendar">
       <PageHeader
         eyebrow="Calendar"
-        title="90-day content plan"
+        title="Content calendar"
         description="Every post the strategy engine has planned, generated, or published."
         actions={
           <Button onClick={() => setShowGenerate(true)}>
@@ -114,12 +136,12 @@ export function Calendar() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={
-                "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
+                "mb-6 flex items-center gap-2.5 rounded-md border-2 px-4 py-3 text-sm " +
                 (runState.status === "running"
                   ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                    : "border-rose-500/30 bg-rose-500/10 text-rose-300")
+                    ? "border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]"
+                    : "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--color-danger)]")
               }
             >
               {runState.status === "running" ? (
@@ -141,31 +163,28 @@ export function Calendar() {
         )}
       </AnimatePresence>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setStatusFilter(f.value)}
-              className={
-                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition " +
-                (statusFilter === f.value
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
-              }
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-1 rounded-full border border-[var(--color-border)] p-1">
+      <div className="mb-4 flex flex-wrap gap-2">
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setStatusFilter(f.value)}
+            className={
+              "rounded-md border-2 px-3 py-1.5 text-xs font-semibold transition " +
+              (statusFilter === f.value
+                ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
+                : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
+            }
+          >
+            {f.label}
+          </button>
+        ))}
+        <div className="ml-auto flex gap-1 rounded-md border-2 border-[var(--color-border)] p-1">
           {MEDIA_FILTERS.map((f) => (
             <button
               key={f.value}
               onClick={() => setMediaFilter(f.value)}
               className={
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition " +
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition " +
                 (mediaFilter === f.value
                   ? "bg-[var(--color-primary)]/15 text-[var(--color-text)]"
                   : "text-[var(--color-text-muted)] hover:bg-white/5")
@@ -195,61 +214,118 @@ export function Calendar() {
         </Card>
       )}
 
-      {posts && posts.length > 0 && filtered.length === 0 && (
-        <Card className="py-16 text-center">
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Nothing matches these filters yet.
-          </p>
-        </Card>
-      )}
+      {posts && posts.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="glass-card p-4 lg:col-span-3">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <button
+                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+                className="rounded-md border-2 border-[var(--color-border)] p-1.5 hover:bg-white/5"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <h3 className="font-[var(--font-display)] font-bold">
+                {month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+              </h3>
+              <button
+                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                className="rounded-md border-2 border-[var(--color-border)] p-1.5 hover:bg-white/5"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
 
-      <div className="space-y-8">
-        {grouped.map(([month, monthPosts]) => (
-          <div key={month}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-faint)]">
-              {month}
-            </h3>
-            <div className="space-y-2">
-              {monthPosts.map((post, i) => (
-                <FadeIn key={post.id} delay={Math.min(i * 0.03, 0.3)}>
-                  <Link to={`/posts/${post.id}`}>
-                    <motion.div
-                      whileHover={{ x: 3 }}
-                      className="glass-card panel-strip flex items-center gap-4 px-5 py-4 transition-colors hover:border-[var(--color-border-strong)]"
-                    >
-                      <div className="w-16 shrink-0 text-center">
-                        <div className="text-lg font-bold leading-none">
-                          {new Date(post.scheduled_at).getDate()}
-                        </div>
-                        <div className="mt-1 text-[10px] uppercase text-[var(--color-text-faint)]">
-                          {new Date(post.scheduled_at).toLocaleDateString(undefined, { weekday: "short" })}
-                        </div>
-                      </div>
-                      {post.media_type === "REELS" ? (
-                        <Film className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
-                      ) : (
-                        <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{post.title || "Untitled"}</div>
-                        <div className="truncate text-xs text-[var(--color-text-faint)]">
-                          {new Date(post.scheduled_at).toLocaleTimeString(undefined, {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}{" "}
-                          · {post.pillar}
-                        </div>
-                      </div>
-                      <StatusBadge status={post.status} />
-                      <ChevronRight className="h-4 w-4 text-[var(--color-text-faint)]" />
-                    </motion.div>
-                  </Link>
-                </FadeIn>
+            <div className="grid grid-cols-7 gap-1.5 px-1 pb-1.5 text-center text-[10px] font-bold uppercase text-[var(--color-text-faint)]">
+              {WEEKDAYS.map((w) => (
+                <div key={w}>{w}</div>
               ))}
             </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {grid.map((d, i) => {
+                if (!d) return <div key={i} />
+                const key = dayKey(d)
+                const dayItems = byDay.get(key) ?? []
+                const isToday = dayKey(today) === key
+                const isSelected = dayKey(selectedDay) === key
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedDay(d)}
+                    className={
+                      "flex aspect-square flex-col items-center justify-start gap-1 rounded-md border-2 p-1.5 text-left transition " +
+                      (isSelected
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                        : isToday
+                          ? "border-[var(--color-border-strong)]"
+                          : "border-[var(--color-border)] hover:bg-white/5")
+                    }
+                  >
+                    <span className={"text-xs font-semibold " + (isToday ? "text-[var(--color-primary)]" : "")}>
+                      {d.getDate()}
+                    </span>
+                    <div className="flex flex-wrap justify-center gap-0.5">
+                      {dayItems.slice(0, 4).map((p) => (
+                        <span
+                          key={p.id}
+                          className={
+                            "h-1.5 w-1.5 rounded-full " +
+                            (p.status === "posted"
+                              ? "bg-[var(--color-success)]"
+                              : p.status === "needs_manual_edit"
+                                ? "bg-[var(--color-danger)]"
+                                : "bg-[var(--color-primary)]")
+                          }
+                        />
+                      ))}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        ))}
-      </div>
+
+          <div className="lg:col-span-2">
+            <h3 className="mb-3 font-[var(--font-display)] text-sm font-bold">
+              {selectedDay.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+            </h3>
+            {dayPosts.length === 0 ? (
+              <div className="glass-card panel-strip py-8 text-center text-sm text-[var(--color-text-muted)]">
+                Nothing scheduled this day.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {dayPosts.map((post, i) => (
+                  <FadeIn key={post.id} delay={Math.min(i * 0.03, 0.3)}>
+                    <Link to={`/posts/${post.id}`}>
+                      <motion.div
+                        whileHover={{ x: 3 }}
+                        className="glass-card panel-strip flex items-center gap-3 px-4 py-3 transition-colors hover:border-[var(--color-border-strong)]"
+                      >
+                        {post.media_type === "REELS" ? (
+                          <Film className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">{post.title || "Untitled"}</div>
+                          <div className="truncate text-xs text-[var(--color-text-faint)]">
+                            {new Date(post.scheduled_at).toLocaleTimeString(undefined, {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}{" "}
+                            · {post.pillar}
+                          </div>
+                        </div>
+                        <StatusBadge status={post.status} />
+                      </motion.div>
+                    </Link>
+                  </FadeIn>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <GenerateModal
         open={showGenerate}
@@ -314,7 +390,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   type="button"
                   onClick={() => setContentType("video")}
                   className={
-                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
+                    "flex items-center justify-center gap-2 rounded-md border-2 p-3 text-sm font-medium transition " +
                     (contentType === "video"
                       ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                       : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
@@ -326,7 +402,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   type="button"
                   onClick={() => setContentType("post")}
                   className={
-                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
+                    "flex items-center justify-center gap-2 rounded-md border-2 p-3 text-sm font-medium transition " +
                     (contentType === "post"
                       ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                       : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
@@ -361,11 +437,11 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                 max={90}
                 value={days}
                 onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-full rounded-md border border-[var(--color-border)] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-white/[0.05] focus:ring-2 focus:ring-[var(--color-primary)]/20"
+                className="w-full rounded-md border-2 border-[var(--color-border)] bg-black/20 px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/30"
               />
             </div>
 
-            {error && <p className="mt-4 text-sm text-rose-400">{error}</p>}
+            {error && <p className="mt-4 text-sm text-[var(--color-danger)]">{error}</p>}
 
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="ghost" onClick={onClose} disabled={starting}>
