@@ -102,7 +102,7 @@ export function Upload() {
   }
 
   return (
-    <div>
+    <div className="section-upload">
       <PageHeader
         eyebrow="Upload"
         title="Upload & schedule your content"
@@ -114,7 +114,7 @@ export function Upload() {
           <Card
             onDragOver={(e) => e.preventDefault()}
             onDrop={onDrop}
-            className="flex aspect-[9/16] flex-col items-center justify-center overflow-hidden p-0 text-center"
+            className="panel-dashed flex aspect-[9/16] flex-col items-center justify-center overflow-hidden p-0 text-center"
           >
             {previewUrl ? (
               <div className="relative h-full w-full">
@@ -220,7 +220,7 @@ export function Upload() {
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300"
+                  className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300"
                 >
                   <Check className="h-4 w-4" /> "{justUploaded}" scheduled — add the next one below.
                 </motion.div>

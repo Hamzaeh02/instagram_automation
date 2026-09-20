@@ -1,30 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --color-bg: #06070d;
-  --color-bg-elevated: #0b0d16;
-  --color-surface: #10121d;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.14);
+  --color-bg: #100f0a;
+  --color-bg-elevated: #17150e;
+  --color-surface: #1c1a12;
+  --color-border: rgba(245, 240, 225, 0.14);
+  --color-border-strong: rgba(245, 240, 225, 0.4);
 
-  --color-text: #f4f5f9;
-  --color-text-muted: #9297ab;
-  --color-text-faint: #5b5f72;
+  --color-text: #f5f1e6;
+  --color-text-muted: #b5ad98;
+  --color-text-faint: #746c58;
 
-  --color-accent-from: #7c5cff;
-  --color-accent-via: #a855f7;
-  --color-accent-to: #22d3ee;
+  --color-accent-from: #d7f43a;
+  --color-accent-via: #d7f43a;
+  --color-accent-to: #ff8a3d;
 
-  --color-primary: #7c5cff;
-  --color-primary-hover: #6947ff;
+  --color-primary: #d7f43a;
+  --color-primary-hover: #c2dc2e;
+  --color-on-primary: #14150a;
 
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger: #f43f5e;
-  --color-info: #38bdf8;
+  --color-success: #3ddc84;
+  --color-warning: #ffb238;
+  --color-danger: #ff5c5c;
+  --color-info: #35c4d1;
+
+  --color-section-upload: #ff8a3d;
+  --color-section-calendar: #2dd4e8;
+  --color-section-create: #ff5cc8;
+  --color-section-settings: #f5f1e6;
+  --color-section-post: #8fd6ff;
+
+  --shadow-hard: 4px 4px 0 0 var(--color-border-strong);
+  --shadow-hard-lg: 7px 7px 0 0 var(--color-border-strong);
 }
 
 @layer base {
@@ -37,9 +47,10 @@
   }
 
   body {
-    background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124, 92, 255, 0.18), transparent),
-      radial-gradient(ellipse 60% 50% at 100% 0%, rgba(34, 211, 238, 0.1), transparent),
-      var(--color-bg);
+    background: var(--color-bg);
+    background-image: linear-gradient(rgba(245, 240, 225, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245, 240, 225, 0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
     background-attachment: fixed;
     color: var(--color-text);
     font-family: var(--font-sans);
@@ -47,7 +58,7 @@
   }
 
   ::selection {
-    background: rgba(124, 92, 255, 0.35);
+    background: rgba(215, 244, 58, 0.4);
   }
 
   ::-webkit-scrollbar {
@@ -58,61 +69,95 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 999px;
+    background: rgba(245, 240, 225, 0.16);
+    border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(245, 240, 225, 0.28);
   }
 }
 
 @layer components {
   .glass-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-    border: 1px solid var(--color-border);
-    backdrop-filter: blur(20px);
-    border-radius: 1.25rem;
+    background: var(--color-surface);
+    border: 2px solid var(--color-border-strong);
+    border-radius: 0.625rem;
+    box-shadow: var(--shadow-hard);
   }
 
   .gradient-text {
-    background-image: linear-gradient(
-      90deg,
-      var(--color-accent-from),
-      var(--color-accent-via),
-      var(--color-accent-to)
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--color-primary);
   }
 
   .gradient-ring {
     position: relative;
-  }
-  .gradient-ring::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(120deg, var(--color-accent-from), var(--color-accent-to));
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0.6;
-    pointer-events: none;
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
   }
 
   .btn-primary {
-    background-image: linear-gradient(90deg, var(--color-accent-from), var(--color-accent-via));
-    color: white;
-    font-weight: 600;
-    transition: filter 0.15s ease, transform 0.15s ease;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: 700;
+    border: 2px solid var(--color-border-strong);
+    box-shadow: var(--shadow-hard);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   }
   .btn-primary:hover {
-    filter: brightness(1.1);
+    background: var(--color-primary-hover);
   }
   .btn-primary:active {
-    transform: scale(0.98);
+    transform: translate(3px, 3px);
+    box-shadow: 1px 1px 0 0 var(--color-border-strong);
+  }
+
+  /* Per-section accent overrides: swapping --color-primary inside a section
+     wrapper re-tints every element that already reads from it (buttons,
+     focus rings, eyebrows, selected pills) without touching those elements. */
+  .section-upload {
+    --color-primary: var(--color-section-upload);
+    --color-primary-hover: color-mix(in srgb, var(--color-section-upload) 82%, black);
+  }
+  .section-calendar {
+    --color-primary: var(--color-section-calendar);
+    --color-primary-hover: color-mix(in srgb, var(--color-section-calendar) 82%, black);
+  }
+  .section-create {
+    --color-primary: var(--color-section-create);
+    --color-primary-hover: color-mix(in srgb, var(--color-section-create) 82%, black);
+  }
+  .section-settings {
+    --color-primary: var(--color-section-settings);
+    --color-primary-hover: color-mix(in srgb, var(--color-section-settings) 82%, black);
+  }
+  .section-post {
+    --color-primary: var(--color-section-post);
+    --color-primary-hover: color-mix(in srgb, var(--color-section-post) 82%, black);
+  }
+
+  /* Card motifs: one distinct structural treatment per section, layered on
+     top of .glass-card so every section reads differently at a glance. */
+  .panel-dashed {
+    border-style: dashed;
+    box-shadow: none;
+  }
+  .panel-strip {
+    border-left-width: 6px;
+    border-left-color: var(--color-primary);
+    box-shadow: none;
+  }
+  .panel-terminal {
+    border-top-width: 6px;
+    border-top-color: var(--color-primary);
+    background: #0d0c08;
+    box-shadow: none;
+  }
+  .panel-flat {
+    border-width: 1px;
+    box-shadow: none;
+  }
+  .panel-ribbon {
+    border-width: 3px;
+    box-shadow: 6px 6px 0 0 var(--color-primary);
   }
 }

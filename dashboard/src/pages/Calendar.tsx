@@ -94,7 +94,7 @@ export function Calendar() {
   }, [filtered])
 
   return (
-    <div>
+    <div className="section-calendar">
       <PageHeader
         eyebrow="Calendar"
         title="90-day content plan"
@@ -114,7 +114,7 @@ export function Calendar() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={
-                "mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm " +
+                "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
                 (runState.status === "running"
                   ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
@@ -150,7 +150,7 @@ export function Calendar() {
               className={
                 "rounded-full border px-3.5 py-1.5 text-xs font-medium transition " +
                 (statusFilter === f.value
-                  ? "border-[var(--color-primary)] bg-violet-500/15 text-[var(--color-text)]"
+                  ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
                   : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
               }
             >
@@ -167,7 +167,7 @@ export function Calendar() {
               className={
                 "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition " +
                 (mediaFilter === f.value
-                  ? "bg-violet-500/15 text-[var(--color-text)]"
+                  ? "bg-[var(--color-primary)]/15 text-[var(--color-text)]"
                   : "text-[var(--color-text-muted)] hover:bg-white/5")
               }
             >
@@ -215,7 +215,7 @@ export function Calendar() {
                   <Link to={`/posts/${post.id}`}>
                     <motion.div
                       whileHover={{ x: 3 }}
-                      className="glass-card flex items-center gap-4 px-5 py-4 transition-colors hover:border-[var(--color-border-strong)]"
+                      className="glass-card panel-strip flex items-center gap-4 px-5 py-4 transition-colors hover:border-[var(--color-border-strong)]"
                     >
                       <div className="w-16 shrink-0 text-center">
                         <div className="text-lg font-bold leading-none">
@@ -314,9 +314,9 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   type="button"
                   onClick={() => setContentType("video")}
                   className={
-                    "flex items-center justify-center gap-2 rounded-xl border p-3 text-sm font-medium transition " +
+                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
                     (contentType === "video"
-                      ? "border-[var(--color-primary)] bg-violet-500/10 text-[var(--color-text)]"
+                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                       : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
                   }
                 >
@@ -326,9 +326,9 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   type="button"
                   onClick={() => setContentType("post")}
                   className={
-                    "flex items-center justify-center gap-2 rounded-xl border p-3 text-sm font-medium transition " +
+                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
                     (contentType === "post"
-                      ? "border-[var(--color-primary)] bg-violet-500/10 text-[var(--color-text)]"
+                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                       : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
                   }
                 >
@@ -361,7 +361,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                 max={90}
                 value={days}
                 onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-full rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-white/[0.05] focus:ring-2 focus:ring-violet-500/20"
+                className="w-full rounded-md border border-[var(--color-border)] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-white/[0.05] focus:ring-2 focus:ring-[var(--color-primary)]/20"
               />
             </div>
 

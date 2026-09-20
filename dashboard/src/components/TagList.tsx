@@ -42,7 +42,7 @@ export function TagList({
         <button
           type="button"
           onClick={add}
-          className="flex shrink-0 items-center justify-center rounded-xl border border-[var(--color-border-strong)] px-3.5 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-[var(--color-text)]"
+          className="flex shrink-0 items-center justify-center rounded-md border-2 border-[var(--color-border-strong)] px-3.5 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-[var(--color-text)]"
         >
           <Plus className="h-4 w-4" />
         </button>

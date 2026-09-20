@@ -2,9 +2,9 @@ import { motion, useMotionTemplate, useMotionValue, useSpring } from "framer-mot
 import clsx from "clsx"
 import type { MouseEvent, ReactNode } from "react"
 
-/** A glass card with a real 3D tilt that tracks the cursor, plus a soft
- * light-follow highlight - the CSS-only "3D" treatment used across the
- * dashboard (the full WebGL scene is reserved for auth/marketing pages). */
+/** A flat, hard-bordered card with a real 3D tilt that tracks the cursor: the
+ * offset drop-shadow slides opposite the tilt, so the card reads as a solid
+ * plate lifting off the page rather than a glossy glass pane. */
 export function TiltCard({
   children,
   className,
@@ -16,9 +16,9 @@ export function TiltCard({
 }) {
   const rotateX = useSpring(useMotionValue(0), { stiffness: 300, damping: 25 })
   const rotateY = useSpring(useMotionValue(0), { stiffness: 300, damping: 25 })
-  const mouseX = useMotionValue(50)
-  const mouseY = useMotionValue(50)
-  const highlight = useMotionTemplate`radial-gradient(320px circle at ${mouseX}% ${mouseY}%, rgba(255,255,255,0.08), transparent 70%)`
+  const shadowX = useSpring(useMotionValue(6), { stiffness: 300, damping: 25 })
+  const shadowY = useSpring(useMotionValue(6), { stiffness: 300, damping: 25 })
+  const boxShadow = useMotionTemplate`${shadowX}px ${shadowY}px 0 0 var(--color-border-strong)`
 
   function handleMouseMove(e: MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -26,23 +26,27 @@ export function TiltCard({
     const py = (e.clientY - rect.top) / rect.height
     rotateY.set((px - 0.5) * intensity)
     rotateX.set((0.5 - py) * intensity)
-    mouseX.set(px * 100)
-    mouseY.set(py * 100)
+    shadowX.set((0.5 - px) * 18)
+    shadowY.set((0.5 - py) * -18 + 10)
   }
 
   function handleMouseLeave() {
     rotateX.set(0)
     rotateY.set(0)
+    shadowX.set(6)
+    shadowY.set(6)
   }
 
   return (
     <motion.div
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      style={{ rotateX, rotateY, transformPerspective: 900 }}
-      className={clsx("glass-card relative overflow-hidden p-6", className)}
+      style={{ rotateX, rotateY, transformPerspective: 900, boxShadow }}
+      className={clsx(
+        "relative overflow-hidden rounded-[0.625rem] border-2 border-[var(--color-border-strong)] bg-[var(--color-surface)] p-6",
+        className,
+      )}
     >
-      <motion.div className="pointer-events-none absolute inset-0" style={{ background: highlight }} />
       <div className="relative" style={{ transform: "translateZ(24px)" }}>
         {children}
       </div>

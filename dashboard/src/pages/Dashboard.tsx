@@ -147,7 +147,7 @@ export function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={
-                "mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm " +
+                "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
                 (runState.status === "running"
                   ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"

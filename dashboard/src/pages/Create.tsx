@@ -36,7 +36,7 @@ export function Create() {
   }
 
   return (
-    <div>
+    <div className="section-create">
       <PageHeader
         eyebrow="Create"
         title="Create a post with AI"
@@ -45,9 +45,11 @@ export function Create() {
 
       <div className="mx-auto max-w-2xl">
         <FadeIn>
-          <Card className="space-y-5">
+          <Card className="panel-terminal space-y-5">
             <div>
-              <Label>What's this post about?</Label>
+              <Label>
+                <span className="mr-1.5 text-[var(--color-primary)]">&gt;_</span>What's this post about?
+              </Label>
               <Textarea
                 autoFocus
                 rows={4}

@@ -144,14 +144,14 @@ export function Settings() {
   ].filter((n): n is { tone: "ok" | "err"; text: string } => Boolean(n))
 
   return (
-    <div>
+    <div className="section-settings">
       <PageHeader eyebrow="Settings" title="Brand & account" description="Everything that powers your automation." />
 
       {notices.map((n, i) => (
         <FadeIn key={i}>
           <div
             className={
-              "mb-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm " +
+              "mb-4 flex items-center gap-2 rounded-md border px-4 py-3 text-sm " +
               (n.tone === "ok"
                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                 : "border-rose-500/30 bg-rose-500/10 text-rose-300")
@@ -165,7 +165,7 @@ export function Settings() {
 
       <section className="mb-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
         <FadeIn>
-          <Card>
+          <Card className="panel-flat">
             <div className="mb-3 flex items-center gap-2">
               <Camera className="h-5 w-5 text-[var(--color-primary)]" />
               <h3 className="font-[var(--font-display)] font-bold">Instagram</h3>
@@ -195,7 +195,7 @@ export function Settings() {
         </FadeIn>
 
         <FadeIn delay={0.03}>
-          <Card>
+          <Card className="panel-flat">
             <div className="mb-3 flex items-center gap-2">
               <Globe className="h-5 w-5 text-[var(--color-primary)]" />
               <h3 className="font-[var(--font-display)] font-bold">Facebook</h3>
@@ -246,7 +246,7 @@ export function Settings() {
         </FadeIn>
 
         <FadeIn delay={0.06}>
-          <Card>
+          <Card className="panel-flat">
             <div className="mb-3 flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-[var(--color-primary)]" />
               <h3 className="font-[var(--font-display)] font-bold">LinkedIn</h3>
@@ -276,7 +276,7 @@ export function Settings() {
         </FadeIn>
 
         <FadeIn delay={0.09}>
-          <Card>
+          <Card className="panel-flat">
             <div className="mb-3 flex items-center gap-2">
               <Music2 className="h-5 w-5 text-[var(--color-primary)]" />
               <h3 className="font-[var(--font-display)] font-bold">TikTok</h3>
@@ -313,7 +313,7 @@ export function Settings() {
         </FadeIn>
 
         <FadeIn delay={0.12}>
-          <Card>
+          <Card className="panel-flat">
             <div className="mb-3 flex items-center gap-2">
               <UserCircle className="h-5 w-5 text-[var(--color-primary)]" />
               <h3 className="font-[var(--font-display)] font-bold">Account</h3>
@@ -334,7 +334,7 @@ export function Settings() {
           </div>
         ) : (
           <FadeIn>
-            <Card className="space-y-5">
+            <Card className="panel-flat space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Brand name</Label>

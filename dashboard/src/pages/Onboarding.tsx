@@ -78,14 +78,15 @@ export function Onboarding() {
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-12">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/4 top-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-[var(--color-accent-from)]/15 blur-[140px]" />
-        <div className="absolute right-0 top-1/3 h-[500px] w-[500px] rounded-full bg-[var(--color-accent-to)]/12 blur-[140px]" />
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-16 -top-16 h-64 w-64 rotate-12 border-4 border-[var(--color-accent-from)]/25" />
+        <div className="absolute -right-20 top-1/3 h-72 w-72 -rotate-12 border-4 border-[var(--color-accent-to)]/20" />
+        <div className="absolute -bottom-24 left-1/3 h-56 w-56 rotate-45 border-4 border-[var(--color-accent-from)]/15" />
       </div>
 
       <div className="mx-auto max-w-2xl">
         <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-lg shadow-violet-900/40">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)] border-2 border-[var(--color-border-strong)]">
             <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="font-[var(--font-display)] text-3xl font-bold tracking-tight">
@@ -367,9 +368,9 @@ function StepVoice({ form, update }: StepProps) {
             type="button"
             onClick={() => update("tts_voice", v.id)}
             className={
-              "rounded-xl border p-3.5 text-left text-sm transition " +
+              "rounded-md border p-3.5 text-left text-sm transition " +
               (form.tts_voice === v.id
-                ? "border-[var(--color-primary)] bg-violet-500/10 text-[var(--color-text)]"
+                ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                 : "border-[var(--color-border)] bg-white/[0.02] text-[var(--color-text-muted)] hover:bg-white/5")
             }
           >
@@ -394,7 +395,7 @@ function StepReview({ form }: { form: BrandProfile }) {
   return (
     <div className="space-y-5">
       <h2 className="font-[var(--font-display)] text-lg font-bold">Review your profile</h2>
-      <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)]">
+      <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-md border border-[var(--color-border)]">
         {rows.map(([label, value]) => (
           <div key={label} className="flex gap-4 px-4 py-3 text-sm">
             <span className="w-28 shrink-0 text-[var(--color-text-faint)]">{label}</span>

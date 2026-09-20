@@ -165,7 +165,7 @@ export function PostDetail() {
   }
 
   return (
-    <div>
+    <div className="section-post">
       <button
         onClick={() => navigate(-1)}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
@@ -209,7 +209,7 @@ export function PostDetail() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <FadeIn className="lg:col-span-2">
-          <Card className="overflow-hidden p-0">
+          <Card className="panel-ribbon overflow-hidden p-0">
             {post.has_video && post.media_type === "IMAGE" ? (
               <img className="aspect-[9/16] w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
             ) : post.has_video ? (
@@ -258,7 +258,7 @@ export function PostDetail() {
                       (!isConnected
                         ? "cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-faint)] opacity-50"
                         : isSelected
-                          ? "border-[var(--color-primary)] bg-violet-500/15 text-[var(--color-text)]"
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
                           : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
                     }
                   >
@@ -460,7 +460,7 @@ function GeneratingPanel({ status }: { status: "planned" | "video_generating" | 
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-        className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-lg shadow-violet-900/40"
+        className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)] border-2 border-[var(--color-border-strong)]"
       >
         <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
       </motion.div>
