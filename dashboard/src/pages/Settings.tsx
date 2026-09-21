@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { Briefcase, Camera, Check, CheckCircle2, Globe, Link2, Music2, Save, UserCircle, Unlink, XCircle } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ComponentType } from "react"
 import { useSearchParams } from "react-router-dom"
 import { api } from "../api/client"
 import { Button, Input, Label, PageHeader, Spinner, Textarea } from "../components/ui"
 import { TagList } from "../components/TagList"
+import { XLogo } from "../components/XLogo"
 import { useAuth } from "../lib/auth"
 import type { BrandProfile } from "../lib/types"
 
@@ -33,6 +34,12 @@ interface TikTokStatus {
   connected_at?: string
 }
 
+interface XStatus {
+  connected: boolean
+  username?: string
+  connected_at?: string
+}
+
 interface FacebookPage {
   id: string
   name: string
@@ -56,6 +63,7 @@ export function Settings() {
   const [fb, setFb] = useState<FacebookStatus | null>(null)
   const [li, setLi] = useState<LinkedInStatus | null>(null)
   const [tt, setTt] = useState<TikTokStatus | null>(null)
+  const [x, setX] = useState<XStatus | null>(null)
   const [fbPages, setFbPages] = useState<FacebookPage[] | null>(null)
 
   async function loadBrand() {
@@ -83,12 +91,17 @@ export function Settings() {
     setTt(await api.get<TikTokStatus>("/tiktok/status"))
   }
 
+  async function loadX() {
+    setX(await api.get<XStatus>("/x/status"))
+  }
+
   useEffect(() => {
     loadBrand()
     loadInstagram()
     loadFacebook()
     loadLinkedIn()
     loadTikTok()
+    loadX()
   }, [])
 
   function update<K extends keyof BrandProfile>(key: K, value: BrandProfile[K]) {
@@ -135,6 +148,11 @@ export function Settings() {
     await loadTikTok()
   }
 
+  async function disconnectX() {
+    await api.delete("/x/connection")
+    await loadX()
+  }
+
   const notice = (platform: string, result: string | null) => {
     if (!result) return null
     if (result === "connected") return { tone: "ok" as const, text: `${platform} connected successfully.` }
@@ -149,6 +167,7 @@ export function Settings() {
     notice("Facebook", searchParams.get("facebook")),
     notice("LinkedIn", searchParams.get("linkedin")),
     notice("TikTok", searchParams.get("tiktok")),
+    notice("X", searchParams.get("x")),
   ].filter((n): n is { tone: "ok" | "err"; text: string } => Boolean(n))
 
   return (
@@ -263,6 +282,14 @@ export function Settings() {
                 connectHref="/api/tiktok/connect"
                 onDisconnect={disconnectTikTok}
               />
+              <IntegrationRow
+                icon={XLogo}
+                name="X"
+                status={x}
+                connectedLabel={x?.connected ? (x.username ? `Connected as @${x.username}` : "Connected") : undefined}
+                connectHref="/api/x/connect"
+                onDisconnect={disconnectX}
+              />
             </div>
           )}
 
@@ -371,7 +398,7 @@ function IntegrationRow<T extends { connected: boolean }>({
   connectHref,
   onDisconnect,
 }: {
-  icon: typeof Camera
+  icon: ComponentType<{ className?: string }>
   name: string
   status: T | null
   connectedLabel?: string

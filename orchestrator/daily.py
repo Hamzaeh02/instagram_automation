@@ -21,12 +21,14 @@ from db.models import (
     RunLog,
     TikTokConnection,
     User,
+    XConnection,
 )
 from db.session import get_session, init_db
 from publish.facebook import FacebookPublisher
 from publish.instagram import InstagramPublisher
 from publish.linkedin import LinkedInPublisher
 from publish.tiktok import TikTokPublisher
+from publish.x import XPublisher
 from storage.upload import upload_file, upload_video
 from strategy.generate_calendar import generate_calendar
 from video.generate import generate_video_for_post
@@ -144,6 +146,35 @@ def _fresh_tiktok_token(session, conn: TikTokConnection) -> str:
     return conn.access_token
 
 
+def _fresh_x_token(session, conn: XConnection) -> str:
+    """X access tokens last only ~2h, so refresh proactively before every
+    publish attempt rather than waiting for a 401 - same reasoning as
+    TikTok's refresh above."""
+    buffer = dt.timedelta(minutes=5)
+    if conn.token_expires_at and conn.token_expires_at - buffer > dt.datetime.utcnow():
+        return conn.access_token
+
+    resp = httpx.post(
+        "https://api.x.com/2/oauth2/token",
+        auth=(settings.x_client_id, settings.x_client_secret),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": conn.refresh_token,
+            "client_id": settings.x_client_id,
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    conn.access_token = body["access_token"]
+    conn.refresh_token = body.get("refresh_token", conn.refresh_token)
+    conn.token_expires_at = dt.datetime.utcnow() + dt.timedelta(seconds=body.get("expires_in", 2 * 3600))
+    session.commit()
+    logger.info("Refreshed X token for user %s", conn.user_id)
+    return conn.access_token
+
+
 def _publish_to_platform(session, post: Post, platform: str, connections: dict) -> None:
     """Publishes one post to one platform, writing the outcome to that
     (post, platform)'s PostPublication row. Failure on one platform never
@@ -191,6 +222,15 @@ def _publish_to_platform(session, post: Post, platform: str, connections: dict) 
             access_token = _fresh_tiktok_token(session, conn)
             publisher = TikTokPublisher(access_token)
             platform_post_id, permalink = publisher.publish(post.video_url, caption, media_type=post.media_type)
+        elif platform == Platform.X.value:
+            conn: XConnection | None = connections.get("x")
+            if not conn or not conn.access_token:
+                raise ValueError("X isn't connected")
+            access_token = _fresh_x_token(session, conn)
+            # X requires direct byte upload, not a hosted URL - use the
+            # local file, same as LinkedIn.
+            publisher = XPublisher(conn.username, access_token)
+            platform_post_id, permalink = publisher.publish(post.video_local_path, caption, media_type=post.media_type)
         else:
             raise ValueError(f"Unknown platform '{platform}'")
 
@@ -225,6 +265,7 @@ def publish_due_posts(session, user_id: int) -> None:
         "facebook": session.query(FacebookConnection).filter(FacebookConnection.user_id == user_id).first(),
         "linkedin": session.query(LinkedInConnection).filter(LinkedInConnection.user_id == user_id).first(),
         "tiktok": session.query(TikTokConnection).filter(TikTokConnection.user_id == user_id).first(),
+        "x": session.query(XConnection).filter(XConnection.user_id == user_id).first(),
     }
 
     for post in due_posts:

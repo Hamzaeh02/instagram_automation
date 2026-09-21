@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowLeft, Briefcase, Camera, Check, ExternalLink, Globe, Music2, Save, Sparkles, Trash2, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ComponentType } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { api, ApiError } from "../api/client"
 import { Button, Card, FadeIn, Label, Spinner, Textarea, Input } from "../components/ui"
 import { StatusBadge } from "../components/StatusBadge"
+import { XLogo } from "../components/XLogo"
 import type { Platform, Post } from "../lib/types"
 
 function toDatetimeLocal(iso: string) {
@@ -13,13 +14,14 @@ function toDatetimeLocal(iso: string) {
   return d.toISOString().slice(0, 16)
 }
 
-const PLATFORM_META: Record<Platform, { label: string; icon: typeof Camera }> = {
+const PLATFORM_META: Record<Platform, { label: string; icon: ComponentType<{ className?: string }> }> = {
   instagram: { label: "Instagram", icon: Camera },
   facebook: { label: "Facebook", icon: Globe },
   linkedin: { label: "LinkedIn", icon: Briefcase },
   tiktok: { label: "TikTok", icon: Music2 },
+  x: { label: "X", icon: XLogo },
 }
-const ALL_PLATFORMS: Platform[] = ["instagram", "facebook", "linkedin", "tiktok"]
+const ALL_PLATFORMS: Platform[] = ["instagram", "facebook", "linkedin", "tiktok", "x"]
 const TABS = ["Content", "Publishing"] as const
 
 export function PostDetail() {
@@ -50,12 +52,14 @@ export function PostDetail() {
       api.get<{ connected: boolean; needs_page?: boolean }>("/facebook/status"),
       api.get<{ connected: boolean }>("/linkedin/status"),
       api.get<{ connected: boolean }>("/tiktok/status"),
-    ]).then(([ig, fb, li, tt]) => {
+      api.get<{ connected: boolean }>("/x/status"),
+    ]).then(([ig, fb, li, tt, x]) => {
       setConnected({
         instagram: ig.connected,
         facebook: fb.connected && !fb.needs_page,
         linkedin: li.connected,
         tiktok: tt.connected,
+        x: x.connected,
       })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

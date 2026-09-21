@@ -17,6 +17,7 @@ from api import (
     routes_posts,
     routes_tiktok,
     routes_uploads,
+    routes_x,
 )
 from api.auth import router as auth_router
 from db.session import init_db
@@ -33,6 +34,7 @@ app.include_router(routes_instagram.router)
 app.include_router(routes_facebook.router)
 app.include_router(routes_linkedin.router)
 app.include_router(routes_tiktok.router)
+app.include_router(routes_x.router)
 app.include_router(routes_ai.router)
 app.include_router(routes_uploads.router)
 app.include_router(routes_create.router)
@@ -47,7 +49,7 @@ _TERMS_HTML = f"""<!doctype html><html><head><title>Terms of Service - Reelmind<
 <h1>Terms of Service</h1>
 <p><small>Last updated: 2026</small></p>
 <p>Reelmind is a content scheduling and AI-assisted content creation tool. By connecting a social
-media account (Instagram, Facebook, LinkedIn, or TikTok) to Reelmind, you authorize it to publish
+media account (Instagram, Facebook, LinkedIn, TikTok, or X) to Reelmind, you authorize it to publish
 posts to that account on your behalf, at times and with content that you review and approve inside
 the app.</p>
 <h2>What Reelmind does</h2>
@@ -79,8 +81,8 @@ _PRIVACY_HTML = f"""<!doctype html><html><head><title>Privacy Policy - Reelmind<
 hashed, never in plain text).</li>
 <li><strong>Brand/content info:</strong> whatever you enter to describe your brand, and any
 files/media you upload or that get generated for you.</li>
-<li><strong>Connected-platform tokens:</strong> when you connect Instagram, Facebook, LinkedIn, or
-TikTok, we store the access token that platform issues so Reelmind can publish on your behalf. We
+<li><strong>Connected-platform tokens:</strong> when you connect Instagram, Facebook, LinkedIn,
+TikTok, or X, we store the access token that platform issues so Reelmind can publish on your behalf. We
 never see or store your password for those platforms - authentication happens entirely on each
 platform's own login page.</li>
 </ul>

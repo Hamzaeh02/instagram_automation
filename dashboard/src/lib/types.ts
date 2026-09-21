@@ -11,7 +11,7 @@ export type PostStatus =
 
 export type PostSource = "ai_generated" | "user_uploaded"
 
-export type Platform = "instagram" | "facebook" | "linkedin" | "tiktok"
+export type Platform = "instagram" | "facebook" | "linkedin" | "tiktok" | "x"
 
 export interface PostPublication {
   platform: Platform

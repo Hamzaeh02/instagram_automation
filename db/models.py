@@ -33,6 +33,7 @@ class Platform(str, enum.Enum):
     FACEBOOK = "facebook"
     LINKEDIN = "linkedin"
     TIKTOK = "tiktok"
+    X = "x"
 
 
 class PublicationStatus(str, enum.Enum):
@@ -165,6 +166,28 @@ class TikTokConnection(Base):
 
     def __repr__(self) -> str:
         return f"<TikTokConnection user={self.user_id} @{self.username}>"
+
+
+class XConnection(Base):
+    """Posts to the connecting user's own X (Twitter) account. Access tokens
+    are short-lived (~2h) with a refresh_token (offline.access scope), same
+    pattern as TikTokConnection - the orchestrator refreshes before each
+    publish attempt."""
+
+    __tablename__ = "x_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+
+    access_token: Mapped[str] = mapped_column(Text, default="")
+    refresh_token: Mapped[str] = mapped_column(Text, default="")
+    token_expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    x_user_id: Mapped[str] = mapped_column(String(100), default="")
+    username: Mapped[str] = mapped_column(String(300), default="")
+    connected_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<XConnection user={self.user_id} @{self.username}>"
 
 
 class Post(Base):

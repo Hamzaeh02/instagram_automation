@@ -73,6 +73,14 @@ class Settings:
     tiktok_client_secret: str = _env_str("TIKTOK_CLIENT_SECRET")
     tiktok_oauth_redirect_uri: str = _env_str("TIKTOK_OAUTH_REDIRECT_URI")
 
+    # X (Twitter) - OAuth 2.0 with PKCE, self-serve app creation. Posts to the
+    # connecting user's own account. Access tokens are short-lived (~2h) with
+    # a refresh_token (offline.access scope), refreshed before each publish
+    # attempt the same way TikTok's is.
+    x_client_id: str = _env_str("X_CLIENT_ID")
+    x_client_secret: str = _env_str("X_CLIENT_SECRET")
+    x_oauth_redirect_uri: str = _env_str("X_OAUTH_REDIRECT_URI")
+
     storage_endpoint_url: str = _env_str("STORAGE_ENDPOINT_URL")
     storage_bucket: str = _env_str("STORAGE_BUCKET")
     storage_access_key_id: str = _env_str("STORAGE_ACCESS_KEY_ID")

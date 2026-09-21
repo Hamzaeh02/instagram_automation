@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from db.models import FacebookConnection, InstagramConnection, LinkedInConnection, Platform, TikTokConnection
+from db.models import FacebookConnection, InstagramConnection, LinkedInConnection, Platform, TikTokConnection, XConnection
 
 
 def connected_platforms(session, user_id: int) -> list[str]:
@@ -24,5 +24,9 @@ def connected_platforms(session, user_id: int) -> list[str]:
     tt = session.query(TikTokConnection).filter(TikTokConnection.user_id == user_id).first()
     if tt and tt.access_token:
         platforms.append(Platform.TIKTOK.value)
+
+    x = session.query(XConnection).filter(XConnection.user_id == user_id).first()
+    if x and x.access_token:
+        platforms.append(Platform.X.value)
 
     return platforms
