@@ -42,7 +42,7 @@ export function TagList({
         <button
           type="button"
           onClick={add}
-          className="flex shrink-0 items-center justify-center rounded-md border border-[var(--color-border-strong)] px-3.5 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-[var(--color-text)]"
+          className="flex shrink-0 items-center justify-center rounded-md border border-[var(--color-border-strong)] px-3.5 text-[var(--color-text-muted)] transition hover:bg-black/5 hover:text-[var(--color-text)]"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -57,13 +57,13 @@ export function TagList({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border-strong)] bg-white/5 py-1.5 pl-3 pr-2 text-sm text-[var(--color-text)]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border-strong)] bg-black/[0.03] py-1.5 pl-3 pr-2 text-sm text-[var(--color-text)]"
             >
               {v}
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="rounded-full p-0.5 text-[var(--color-text-faint)] hover:bg-white/10 hover:text-white"
+                className="rounded-full p-0.5 text-[var(--color-text-faint)] hover:bg-black/10 hover:text-[var(--color-text)]"
               >
                 <X className="h-3 w-3" />
               </button>

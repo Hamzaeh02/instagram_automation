@@ -200,7 +200,7 @@ export function Settings() {
                 "flex shrink-0 items-center gap-2.5 rounded-md border px-3.5 py-2.5 text-sm font-semibold transition " +
                 (section === s.id
                   ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                  : "border-transparent text-[var(--color-text-muted)] hover:bg-white/5")
+                  : "border-transparent text-[var(--color-text-muted)] hover:bg-black/5")
               }
             >
               <s.icon className="h-4 w-4" />
@@ -249,7 +249,7 @@ export function Settings() {
                           <button
                             key={p.id}
                             onClick={() => chooseFacebookPage(p.id)}
-                            className="block w-full truncate rounded-md border border-[var(--color-border)] px-3 py-2 text-left text-sm hover:border-[var(--color-border-strong)] hover:bg-white/5"
+                            className="block w-full truncate rounded-md border border-[var(--color-border)] px-3 py-2 text-left text-sm hover:border-[var(--color-border-strong)] hover:bg-black/5"
                           >
                             {p.name}
                           </button>

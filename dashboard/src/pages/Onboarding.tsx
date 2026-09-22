@@ -149,7 +149,7 @@ function StepProgress({ steps, current }: { steps: string[]; current: number }) 
     <div className="flex items-center gap-1.5">
       {steps.map((label, i) => (
         <div key={label} className="flex flex-1 flex-col items-center gap-2">
-          <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/8">
+          <div className="relative h-1 w-full overflow-hidden rounded-full bg-black/8">
             {i <= current && (
               <motion.div
                 layoutId={`bar-${i}`}
@@ -371,7 +371,7 @@ function StepVoice({ form, update }: StepProps) {
               "rounded-md border p-3.5 text-left text-sm transition " +
               (form.tts_voice === v.id
                 ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                : "border-[var(--color-border)] bg-white/[0.02] text-[var(--color-text-muted)] hover:bg-white/5")
+                : "border-[var(--color-border)] bg-black/[0.02] text-[var(--color-text-muted)] hover:bg-black/5")
             }
           >
             {v.label}

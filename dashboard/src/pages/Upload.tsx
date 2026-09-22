@@ -248,7 +248,7 @@ export function Upload() {
                   </div>
                 </div>
 
-                <div className="rounded-md border border-[var(--color-border)] bg-black/20 p-4">
+                <div className="rounded-md border border-[var(--color-border)] bg-black/[0.03] p-4">
                   <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-faint)]">Ready to schedule</p>
                   <p className="mt-1 truncate text-sm font-medium">{title || file?.name || "Untitled"}</p>
                   <p className="text-xs text-[var(--color-text-faint)]">{caption ? caption.slice(0, 80) : "No caption yet"}</p>

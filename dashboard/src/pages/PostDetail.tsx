@@ -341,7 +341,7 @@ export function PostDetail() {
                         ? "cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-faint)] opacity-50"
                         : isSelected
                           ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
-                          : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
+                          : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
                     }
                   >
                     <meta.icon className="h-3.5 w-3.5" />
@@ -489,7 +489,7 @@ function GeneratingPanel({ status }: { status: "planned" | "video_generating" | 
         <p className="text-sm font-medium text-[var(--color-text)]">{label}</p>
         <p className="mt-1 text-xs text-[var(--color-text-faint)]">{detail}</p>
       </div>
-      <div className="h-1.5 w-40 overflow-hidden rounded-full bg-white/8">
+      <div className="h-1.5 w-40 overflow-hidden rounded-full bg-black/8">
         <motion.div
           className="h-full w-1/3 rounded-full bg-gradient-to-r from-[var(--color-accent-from)] to-[var(--color-accent-to)]"
           animate={{ x: ["-100%", "220%"] }}

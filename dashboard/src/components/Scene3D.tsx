@@ -50,24 +50,24 @@ export function Scene3D() {
       gl={{ antialias: true, alpha: true }}
       style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
     >
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[4, 6, 5]} intensity={0.7} color="#f0ece2" />
+      <ambientLight intensity={1.1} />
+      <directionalLight position={[4, 6, 5]} intensity={0.5} color="#ffffff" />
       <Suspense fallback={null}>
         <Grid
           position={[0, -2.4, 0]}
           args={[30, 30]}
           cellSize={0.6}
           cellThickness={0.5}
-          cellColor="#2a2822"
+          cellColor="#e7e4d9"
           sectionSize={3}
           sectionThickness={0.7}
-          sectionColor="#3a382f"
+          sectionColor="#d6d2c2"
           fadeDistance={14}
           infiniteGrid
         />
         <SpinningShape
           position={[-1.6, 0.6, -1]}
-          color="#4a4740"
+          color="#d8d4c6"
           scale={1.3}
           speed={[0.08, 0.12]}
           wireframe

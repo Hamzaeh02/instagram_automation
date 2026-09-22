@@ -27,9 +27,9 @@ export function Button({
     "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-bold transition-all disabled:opacity-40 disabled:pointer-events-none"
   const variants: Record<string, string> = {
     primary: "btn-primary",
-    ghost: "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-white/5",
+    ghost: "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-black/5",
     outline:
-      "border border-[var(--color-border-strong)] text-[var(--color-text)] hover:bg-white/5",
+      "border border-[var(--color-border-strong)] text-[var(--color-text)] hover:bg-black/5",
     danger: "bg-[var(--color-danger)]/15 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/25 border border-[var(--color-danger)]/40",
   }
   return (
@@ -44,7 +44,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={clsx(
-        "w-full rounded-md border border-[var(--color-border)] bg-black/20 px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/30",
+        "w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]",
         props.className,
       )}
     />
@@ -56,7 +56,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       className={clsx(
-        "w-full rounded-md border border-[var(--color-border)] bg-black/20 px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/30",
+        "w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]",
         props.className,
       )}
     />

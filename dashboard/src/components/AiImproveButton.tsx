@@ -42,7 +42,7 @@ export function AiImproveButton({
         onClick={improve}
         disabled={!text.trim() || loading}
         title="Optimize with AI"
-        className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-white/5 px-2 py-0.5 text-[11px] font-bold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/15 disabled:opacity-30 disabled:pointer-events-none"
+        className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-strong)] bg-black/[0.03] px-2 py-0.5 text-[11px] font-bold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/15 disabled:opacity-30 disabled:pointer-events-none"
       >
         {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
         {loading ? "Optimizing…" : "Optimize"}

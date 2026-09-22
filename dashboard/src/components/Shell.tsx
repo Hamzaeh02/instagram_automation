@@ -59,7 +59,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="border-t-2 border-[var(--color-border-strong)] p-3">
           <button
             onClick={() => logout()}
-            className="flex w-full items-center gap-3 rounded-md px-3.5 py-2.5 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-white/5 hover:text-[var(--color-text)]"
+            className="flex w-full items-center gap-3 rounded-md px-3.5 py-2.5 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-black/5 hover:text-[var(--color-text)]"
           >
             <LogOut className="h-[18px] w-[18px]" strokeWidth={2.25} />
             Sign out

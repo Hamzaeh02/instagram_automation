@@ -126,7 +126,7 @@ export function Dashboard() {
         {statuses.map((s) => (
           <div
             key={s.key}
-            className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-black/20 px-3 py-1.5"
+            className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3 py-1.5"
           >
             <s.icon className="h-3.5 w-3.5 text-[var(--color-text-muted)]" strokeWidth={2} />
             <span className="text-xs font-semibold">{s.label}</span>
@@ -145,7 +145,7 @@ export function Dashboard() {
               className={
                 "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
                 (runState.status === "running"
-                  ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
+                  ? "border-[var(--color-border)] bg-black/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
                     ? "border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]"
                     : "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--color-danger)]")
@@ -248,7 +248,7 @@ export function Dashboard() {
                   <Link
                     key={p.id}
                     to={`/posts/${p.id}`}
-                    className="flex items-center justify-between gap-3 px-5 py-3 transition hover:bg-white/[0.03]"
+                    className="flex items-center justify-between gap-3 px-5 py-3 transition hover:bg-black/[0.03]"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{p.title || "Untitled"}</div>
@@ -276,7 +276,7 @@ export function Dashboard() {
                   <Link
                     key={q.to}
                     to={q.to}
-                    className="flex items-center gap-2.5 rounded-md border border-[var(--color-border)] px-3 py-2.5 text-sm font-semibold transition hover:border-[var(--color-primary)] hover:bg-white/[0.03]"
+                    className="flex items-center gap-2.5 rounded-md border border-[var(--color-border)] px-3 py-2.5 text-sm font-semibold transition hover:border-[var(--color-primary)] hover:bg-black/[0.03]"
                   >
                     <q.icon className="h-4 w-4 text-[var(--color-primary)]" />
                     {q.label}

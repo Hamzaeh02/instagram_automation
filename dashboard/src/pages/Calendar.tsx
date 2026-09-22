@@ -138,7 +138,7 @@ export function Calendar() {
               className={
                 "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
                 (runState.status === "running"
-                  ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
+                  ? "border-[var(--color-border)] bg-black/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
                     ? "border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]"
                     : "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--color-danger)]")
@@ -172,7 +172,7 @@ export function Calendar() {
               "rounded-md border px-3 py-1.5 text-xs font-semibold transition " +
               (statusFilter === f.value
                 ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
-                : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
+                : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
             }
           >
             {f.label}
@@ -187,7 +187,7 @@ export function Calendar() {
                 "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition " +
                 (mediaFilter === f.value
                   ? "bg-[var(--color-primary)]/15 text-[var(--color-text)]"
-                  : "text-[var(--color-text-muted)] hover:bg-white/5")
+                  : "text-[var(--color-text-muted)] hover:bg-black/5")
               }
             >
               <f.icon className="h-3.5 w-3.5" />
@@ -220,7 +220,7 @@ export function Calendar() {
             <div className="mb-3 flex items-center justify-between px-1">
               <button
                 onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-white/5"
+                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-black/5"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -229,7 +229,7 @@ export function Calendar() {
               </h3>
               <button
                 onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-white/5"
+                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-black/5"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -257,7 +257,7 @@ export function Calendar() {
                         ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
                         : isToday
                           ? "border-[var(--color-border-strong)]"
-                          : "border-[var(--color-border)] hover:bg-white/5")
+                          : "border-[var(--color-border)] hover:bg-black/5")
                     }
                   >
                     <span className={"text-xs font-semibold " + (isToday ? "text-[var(--color-primary)]" : "")}>
@@ -393,7 +393,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                     "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
                     (contentType === "video"
                       ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                      : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
+                      : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
                   }
                 >
                   <Film className="h-4 w-4" /> Video Reels
@@ -405,7 +405,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                     "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
                     (contentType === "post"
                       ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                      : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
+                      : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
                   }
                 >
                   <ImageIcon className="h-4 w-4" /> Photo posts
@@ -437,7 +437,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                 max={90}
                 value={days}
                 onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-full rounded-md border border-[var(--color-border)] bg-black/20 px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/30"
+                className="w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]"
               />
             </div>
 
