@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { CalendarPlus, Check, ChevronRight, File as FileIcon, Film, Image as ImageIcon, Sparkles, Upload, X, XCircle } from "lucide-react"
+import { ArrowLeft, CalendarPlus, Check, ChevronRight, File as FileIcon, Film, Image as ImageIcon, Sparkles, Trash2, Upload, X, XCircle } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api, ApiError } from "../api/client"
@@ -31,6 +31,12 @@ export function Calendar() {
   const [mediaFilter, setMediaFilter] = useState<"all" | "REELS" | "IMAGE">("all")
   const [showGenerate, setShowGenerate] = useState(false)
   const [runState, setRunState] = useState<{ status: "running" | "done" | "error"; message?: string } | null>(null)
+  const [actioningId, setActioningId] = useState<number | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<Post | null>(null)
+  const [rejectReason, setRejectReason] = useState("")
+  const [rejectBusy, setRejectBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Post | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const pollRef = useRef<number | null>(null)
 
   async function load() {
@@ -71,6 +77,40 @@ export function Calendar() {
         setTimeout(() => setRunState((s) => (s?.status === "done" ? null : s)), 6000)
       }
     }, POLL_MS)
+  }
+
+  async function quickApprove(post: Post) {
+    setActioningId(post.id)
+    try {
+      await api.post(`/posts/${post.id}/approve`)
+      await load()
+    } finally {
+      setActioningId(null)
+    }
+  }
+
+  async function confirmReject() {
+    if (!rejectTarget || !rejectReason.trim()) return
+    setRejectBusy(true)
+    try {
+      await api.post(`/posts/${rejectTarget.id}/reject`, { reason: rejectReason.trim() })
+      setRejectTarget(null)
+      await load()
+    } finally {
+      setRejectBusy(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleteBusy(true)
+    try {
+      await api.delete(`/posts/${deleteTarget.id}`)
+      setDeleteTarget(null)
+      await load()
+    } finally {
+      setDeleteBusy(false)
+    }
   }
 
   const filtered = useMemo(() => {
@@ -205,42 +245,88 @@ export function Calendar() {
               {month}
             </h3>
             <div className="space-y-2">
-              {monthPosts.map((post, i) => (
-                <FadeIn key={post.id} delay={Math.min(i * 0.03, 0.3)}>
-                  <Link to={`/posts/${post.id}`}>
+              {monthPosts.map((post, i) => {
+                const canReview = post.status === "pending_review" || post.status === "needs_manual_edit"
+                const canDelete = post.status !== "posted" && post.status !== "publishing"
+                return (
+                  <FadeIn key={post.id} delay={Math.min(i * 0.03, 0.3)}>
                     <motion.div
                       whileHover={{ x: 3 }}
                       className="glass-card flex items-center gap-4 px-5 py-4 transition-colors hover:border-[var(--color-border-strong)]"
                     >
-                      <div className="w-16 shrink-0 text-center">
-                        <div className="text-lg font-bold leading-none">
-                          {new Date(post.scheduled_at).getDate()}
+                      <Link to={`/posts/${post.id}`} className="flex min-w-0 flex-1 items-center gap-4">
+                        <div className="w-16 shrink-0 text-center">
+                          <div className="text-lg font-bold leading-none">
+                            {new Date(post.scheduled_at).getDate()}
+                          </div>
+                          <div className="mt-1 text-[10px] uppercase text-[var(--color-text-faint)]">
+                            {new Date(post.scheduled_at).toLocaleDateString(undefined, { weekday: "short" })}
+                          </div>
                         </div>
-                        <div className="mt-1 text-[10px] uppercase text-[var(--color-text-faint)]">
-                          {new Date(post.scheduled_at).toLocaleDateString(undefined, { weekday: "short" })}
+                        {post.media_type === "REELS" ? (
+                          <Film className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">{post.title || "Untitled"}</div>
+                          <div className="truncate text-xs text-[var(--color-text-faint)]">
+                            {new Date(post.scheduled_at).toLocaleTimeString(undefined, {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}{" "}
+                            · {post.pillar}
+                          </div>
                         </div>
-                      </div>
-                      {post.media_type === "REELS" ? (
-                        <Film className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
-                      ) : (
-                        <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                      </Link>
+
+                      {(canReview || canDelete) && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          {canReview && (
+                            <>
+                              <button
+                                type="button"
+                                title="Approve"
+                                disabled={actioningId === post.id}
+                                onClick={() => quickApprove(post)}
+                                className="rounded-md p-1.5 text-[var(--color-text-faint)] transition hover:bg-[var(--color-success)]/10 hover:text-[var(--color-success)] disabled:opacity-40"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Reject"
+                                onClick={() => {
+                                  setRejectReason("")
+                                  setRejectTarget(post)
+                                }}
+                                className="rounded-md p-1.5 text-[var(--color-text-faint)] transition hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                          {canDelete && (
+                            <button
+                              type="button"
+                              title="Delete"
+                              onClick={() => setDeleteTarget(post)}
+                              className="rounded-md p-1.5 text-[var(--color-text-faint)] transition hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{post.title || "Untitled"}</div>
-                        <div className="truncate text-xs text-[var(--color-text-faint)]">
-                          {new Date(post.scheduled_at).toLocaleTimeString(undefined, {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}{" "}
-                          · {post.pillar}
-                        </div>
-                      </div>
+
                       <StatusBadge status={post.status} />
-                      <ChevronRight className="h-4 w-4 text-[var(--color-text-faint)]" />
+                      <Link to={`/posts/${post.id}`}>
+                        <ChevronRight className="h-4 w-4 text-[var(--color-text-faint)]" />
+                      </Link>
                     </motion.div>
-                  </Link>
-                </FadeIn>
-              ))}
+                  </FadeIn>
+                )
+              })}
             </div>
           </div>
         ))}
@@ -254,6 +340,82 @@ export function Calendar() {
           watchRun()
         }}
       />
+
+      <AnimatePresence>
+        {rejectTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => !rejectBusy && setRejectTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-card w-full max-w-md p-6"
+            >
+              <h3 className="font-[var(--font-display)] text-lg font-bold">Why are you rejecting this?</h3>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                "{rejectTarget.title || "Untitled"}" — your feedback is used to regenerate it.
+              </p>
+              <Textarea
+                autoFocus
+                rows={3}
+                className="mt-4"
+                placeholder="e.g. the hook is weak, make it punchier"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+              <div className="mt-4 flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setRejectTarget(null)} disabled={rejectBusy}>
+                  Cancel
+                </Button>
+                <Button variant="danger" onClick={confirmReject} disabled={rejectBusy || !rejectReason.trim()}>
+                  {rejectBusy ? "Submitting…" : "Confirm rejection"}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => !deleteBusy && setDeleteTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-card w-full max-w-md p-6"
+            >
+              <h3 className="font-[var(--font-display)] text-lg font-bold">
+                Delete "{deleteTarget.title || "this post"}"?
+              </h3>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                This can't be undone — the post, its video/image, and its publish history will all be gone.
+              </p>
+              <div className="mt-4 flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>
+                  Cancel
+                </Button>
+                <Button variant="danger" onClick={confirmDelete} disabled={deleteBusy}>
+                  {deleteBusy ? "Deleting…" : "Delete post"}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -261,27 +423,54 @@ export function Calendar() {
 const DOCUMENT_ACCEPT = ".txt,.md,.pdf,.docx"
 
 function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted: () => void }) {
+  const [phase, setPhase] = useState<"input" | "review">("input")
   const [contentType, setContentType] = useState<"video" | "post">("video")
   const [brief, setBrief] = useState("")
   const [docFile, setDocFile] = useState<File | null>(null)
   const [days, setDays] = useState(90)
+  const [summary, setSummary] = useState("")
+  const [analyzing, setAnalyzing] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  async function start() {
+  function reset() {
+    setPhase("input")
+    setBrief("")
+    setDocFile(null)
+    setSummary("")
+    setError(null)
+  }
+
+  async function analyze() {
     if (!brief.trim() && !docFile) return
+    setAnalyzing(true)
+    setError(null)
+    try {
+      const formData = new FormData()
+      formData.append("brief", brief.trim())
+      if (docFile) formData.append("document", docFile)
+      const res = await api.upload<{ summary: string }>("/calendar/analyze", formData)
+      setSummary(res.summary)
+      setPhase("review")
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't analyze that")
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  async function start() {
+    if (!summary.trim()) return
     setStarting(true)
     setError(null)
     try {
       const formData = new FormData()
       formData.append("days", String(days))
       formData.append("content_type", contentType)
-      formData.append("brief", brief.trim())
-      if (docFile) formData.append("document", docFile)
+      formData.append("brief", summary.trim())
       await api.upload("/calendar/generate", formData)
-      setBrief("")
-      setDocFile(null)
+      reset()
       onStarted()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't start generating")
@@ -298,7 +487,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => !starting && onClose()}
+          onClick={() => !starting && !analyzing && onClose()}
         >
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
@@ -307,118 +496,171 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
             onClick={(e) => e.stopPropagation()}
             className="glass-card w-full max-w-lg p-6"
           >
-            <h3 className="font-[var(--font-display)] text-lg font-bold">Generate content</h3>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Describe it, upload a document, or both — the strategy engine writes and schedules it for you.
-            </p>
+            {phase === "input" ? (
+              <>
+                <h3 className="font-[var(--font-display)] text-lg font-bold">Generate content</h3>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  Describe it, upload a document, or both — we'll show you what we understood before anything's
+                  generated.
+                </p>
 
-            <div className="mt-5">
-              <Label>Content type</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setContentType("video")}
-                  className={
-                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
-                    (contentType === "video"
-                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                      : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
-                  }
-                >
-                  <Film className="h-4 w-4" /> Video Reels
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setContentType("post")}
-                  className={
-                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
-                    (contentType === "post"
-                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                      : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
-                  }
-                >
-                  <ImageIcon className="h-4 w-4" /> Photo posts
-                </button>
-              </div>
-              <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
-                {contentType === "video"
-                  ? "Script, voiceover, stock b-roll, and burned-in captions."
-                  : "A caption + matching stock photo for each date, no video."}
-              </p>
-            </div>
-
-            <div className="mt-5">
-              <Label>What should this run be about?</Label>
-              <Textarea
-                autoFocus
-                rows={4}
-                placeholder="e.g. Focus the next batch on our new winter product line, more customer testimonials, and less generic tips"
-                value={brief}
-                onChange={(e) => setBrief(e.target.value)}
-              />
-            </div>
-
-            <div className="mt-5">
-              <Label>Or upload a document (optional)</Label>
-              <p className="-mt-1 mb-2 text-[11px] text-[var(--color-text-faint)]">
-                A business plan, brand brief, or style guide — it'll be analyzed and folded into the brief above.
-              </p>
-              {docFile ? (
-                <div className="flex items-center gap-2.5 rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5">
-                  <FileIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
-                  <span className="min-w-0 flex-1 truncate text-sm">{docFile.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDocFile(null)
-                      if (fileInputRef.current) fileInputRef.current.value = ""
-                    }}
-                    className="shrink-0 rounded-md p-1 text-[var(--color-text-faint)] hover:bg-black/5 hover:text-[var(--color-text)]"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                <div className="mt-5">
+                  <Label>Content type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setContentType("video")}
+                      className={
+                        "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
+                        (contentType === "video"
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
+                          : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
+                      }
+                    >
+                      <Film className="h-4 w-4" /> Video Reels
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContentType("post")}
+                      className={
+                        "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
+                        (contentType === "post"
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
+                          : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
+                      }
+                    >
+                      <ImageIcon className="h-4 w-4" /> Photo posts
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+                    {contentType === "video"
+                      ? "Script, voiceover, stock b-roll, and burned-in captions."
+                      : "A caption + matching stock photo for each date, no video."}
+                  </p>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-[var(--color-border-strong)] px-3.5 py-3 text-sm text-[var(--color-text-muted)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-text)]"
-                >
-                  <Upload className="h-4 w-4" /> Choose a .txt, .pdf, or .docx file
-                </button>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={DOCUMENT_ACCEPT}
-                className="hidden"
-                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
 
-            <div className="mt-5 w-32">
-              <Label>Days to plan</Label>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={days}
-                onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]"
-              />
-            </div>
+                <div className="mt-5">
+                  <Label>What should this run be about?</Label>
+                  <Textarea
+                    autoFocus
+                    rows={4}
+                    placeholder="e.g. Focus the next batch on our new winter product line, more customer testimonials, and less generic tips"
+                    value={brief}
+                    onChange={(e) => setBrief(e.target.value)}
+                  />
+                </div>
 
-            {error && <p className="mt-4 text-sm text-[var(--color-danger)]">{error}</p>}
+                <div className="mt-5">
+                  <Label>Or upload a document (optional)</Label>
+                  <p className="-mt-1 mb-2 text-[11px] text-[var(--color-text-faint)]">
+                    A business plan, brand brief, or style guide — we'll read it and show you what we found next.
+                  </p>
+                  {docFile ? (
+                    <div className="flex items-center gap-2.5 rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5">
+                      <FileIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{docFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDocFile(null)
+                          if (fileInputRef.current) fileInputRef.current.value = ""
+                        }}
+                        className="shrink-0 rounded-md p-1 text-[var(--color-text-faint)] hover:bg-black/5 hover:text-[var(--color-text)]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-[var(--color-border-strong)] px-3.5 py-3 text-sm text-[var(--color-text-muted)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-text)]"
+                    >
+                      <Upload className="h-4 w-4" /> Choose a .txt, .pdf, or .docx file
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={DOCUMENT_ACCEPT}
+                    className="hidden"
+                    onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="ghost" onClick={onClose} disabled={starting}>
-                Cancel
-              </Button>
-              <Button onClick={start} disabled={starting || (!brief.trim() && !docFile)}>
-                {starting ? <Spinner className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
-                {starting ? "Starting…" : "Generate"}
-              </Button>
-            </div>
+                <div className="mt-5 w-32">
+                  <Label>Days to plan</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={days}
+                    onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
+                    className="w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]"
+                  />
+                </div>
+
+                {error && <p className="mt-4 text-sm text-[var(--color-danger)]">{error}</p>}
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <Button variant="ghost" onClick={onClose} disabled={analyzing}>
+                    Cancel
+                  </Button>
+                  <Button onClick={analyze} disabled={analyzing || (!brief.trim() && !docFile)}>
+                    {analyzing ? <Spinner className="h-4 w-4" /> : null}
+                    {analyzing ? "Analyzing…" : "Next: review"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="font-[var(--font-display)] text-lg font-bold">Review before generating</h3>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  Here's what we understood — edit anything, then we'll plan {days} day{days === 1 ? "" : "s"} of{" "}
+                  {contentType === "video" ? "Reels" : "posts"} around it.
+                </p>
+
+                <div className="mt-5">
+                  <Label>Content plan brief</Label>
+                  <Textarea
+                    autoFocus
+                    rows={9}
+                    value={summary}
+                    onChange={(e) => setSummary(e.target.value)}
+                    className="font-mono text-[13px] leading-relaxed"
+                  />
+                </div>
+
+                <div className="mt-5 w-32">
+                  <Label>Days to plan</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={days}
+                    onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
+                    className="w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]"
+                  />
+                </div>
+
+                {error && <p className="mt-4 text-sm text-[var(--color-danger)]">{error}</p>}
+
+                <div className="mt-6 flex items-center justify-between gap-3">
+                  <Button variant="ghost" onClick={() => setPhase("input")} disabled={starting}>
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </Button>
+                  <div className="flex gap-3">
+                    <Button variant="ghost" onClick={onClose} disabled={starting}>
+                      Cancel
+                    </Button>
+                    <Button onClick={start} disabled={starting || !summary.trim()}>
+                      {starting ? <Spinner className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
+                      {starting ? "Starting…" : "Generate"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </motion.div>
         </motion.div>
       )}

@@ -77,6 +77,47 @@ def _generate_calendar_safely(
         session.close()
 
 
+@router.post("/calendar/analyze")
+async def analyze_calendar_brief(
+    brief: str = Form(""),
+    document: UploadFile | None = File(None),
+    user: User = Depends(require_auth),
+):
+    """Turns whatever the user typed and/or uploaded into one plain-text
+    brief for them to review and edit before anything is actually generated -
+    the step between "here's my input" and "go plan 90 days of content" that
+    was previously missing (uploading a document used to kick off generation
+    immediately, with no chance to see what the AI took away from it first).
+    Only uploaded documents get an LLM summarization pass; a typed-only brief
+    is short enough to just pass through, so this stays fast in that case."""
+    document_text = ""
+    if document is not None and document.filename:
+        raw = await document.read()
+        try:
+            document_text = extract_text(document.filename, raw)
+        except DocumentTextError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not brief.strip() and not document_text:
+        raise HTTPException(status_code=400, detail="Describe what this content run should be about, or upload a document")
+
+    session = get_session()
+    try:
+        brand = get_profile(session, user.id)
+        if not brand or not brand.niche:
+            raise HTTPException(status_code=400, detail="Set up your brand profile before generating content")
+    finally:
+        session.close()
+
+    if document_text:
+        doc_summary = summarize_for_content_strategy(document_text)
+        summary = f"{brief}\n\n{doc_summary}".strip() if brief.strip() else doc_summary
+    else:
+        summary = brief.strip()
+
+    return {"summary": summary}
+
+
 @router.post("/calendar/generate")
 async def trigger_calendar_generation(
     background_tasks: BackgroundTasks,
