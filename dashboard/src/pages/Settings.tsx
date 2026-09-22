@@ -178,7 +178,7 @@ export function Settings() {
         <div key={i}>
           <div
             className={
-              "mb-4 flex items-center gap-2 rounded-md border-2 px-4 py-3 text-sm " +
+              "mb-4 flex items-center gap-2 rounded-md border px-4 py-3 text-sm " +
               (n.tone === "ok"
                 ? "border-[var(--color-success)]/40 bg-[var(--color-success)]/10 text-[var(--color-success)]"
                 : "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 text-[var(--color-danger)]")
@@ -197,7 +197,7 @@ export function Settings() {
               key={s.id}
               onClick={() => setSection(s.id)}
               className={
-                "flex shrink-0 items-center gap-2.5 rounded-md border-2 px-3.5 py-2.5 text-sm font-semibold transition " +
+                "flex shrink-0 items-center gap-2.5 rounded-md border px-3.5 py-2.5 text-sm font-semibold transition " +
                 (section === s.id
                   ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                   : "border-transparent text-[var(--color-text-muted)] hover:bg-white/5")
@@ -249,7 +249,7 @@ export function Settings() {
                           <button
                             key={p.id}
                             onClick={() => chooseFacebookPage(p.id)}
-                            className="block w-full truncate rounded-md border-2 border-[var(--color-border)] px-3 py-2 text-left text-sm hover:border-[var(--color-border-strong)] hover:bg-white/5"
+                            className="block w-full truncate rounded-md border border-[var(--color-border)] px-3 py-2 text-left text-sm hover:border-[var(--color-border-strong)] hover:bg-white/5"
                           >
                             {p.name}
                           </button>
@@ -372,7 +372,7 @@ export function Settings() {
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="flex items-center gap-1.5 rounded-full border-2 border-[var(--color-success)]/40 bg-[var(--color-success)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-success)]"
+                        className="flex items-center gap-1.5 rounded-full border border-[var(--color-success)]/40 bg-[var(--color-success)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-success)]"
                       >
                         <Check className="h-3.5 w-3.5" /> Profile updated successfully
                       </motion.div>

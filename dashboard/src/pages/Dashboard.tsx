@@ -122,7 +122,7 @@ export function Dashboard() {
 
       {/* Status strip: every connection state in one horizontal bar instead
           of a grid of separate cards. */}
-      <div className="mb-8 flex flex-wrap items-center gap-2 rounded-md border-2 border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 py-3">
+      <div className="mb-8 flex flex-wrap items-center gap-2 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 py-3">
         {statuses.map((s) => (
           <div
             key={s.key}
@@ -143,7 +143,7 @@ export function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={
-                "mb-6 flex items-center gap-2.5 rounded-md border-2 px-4 py-3 text-sm " +
+                "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
                 (runState.status === "running"
                   ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
@@ -198,7 +198,7 @@ export function Dashboard() {
                     <div className="flex flex-col items-center">
                       <span
                         className={
-                          "mt-0.5 h-3 w-3 shrink-0 rounded-full border-2 border-[var(--color-bg-elevated)] " +
+                          "mt-0.5 h-3 w-3 shrink-0 rounded-full border border-[var(--color-bg-elevated)] " +
                           (run.status === "ok"
                             ? "bg-[var(--color-success)]"
                             : run.status === "error"
@@ -276,7 +276,7 @@ export function Dashboard() {
                   <Link
                     key={q.to}
                     to={q.to}
-                    className="flex items-center gap-2.5 rounded-md border-2 border-[var(--color-border)] px-3 py-2.5 text-sm font-semibold transition hover:border-[var(--color-primary)] hover:bg-white/[0.03]"
+                    className="flex items-center gap-2.5 rounded-md border border-[var(--color-border)] px-3 py-2.5 text-sm font-semibold transition hover:border-[var(--color-primary)] hover:bg-white/[0.03]"
                   >
                     <q.icon className="h-4 w-4 text-[var(--color-primary)]" />
                     {q.label}

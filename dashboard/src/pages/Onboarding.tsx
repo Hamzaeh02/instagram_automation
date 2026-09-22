@@ -86,7 +86,7 @@ export function Onboarding() {
 
       <div className="mx-auto max-w-2xl">
         <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)] border-2 border-[var(--color-border-strong)]">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] border border-[var(--color-border-strong)]">
             <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="font-[var(--font-display)] text-3xl font-bold tracking-tight">

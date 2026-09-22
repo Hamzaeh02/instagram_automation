@@ -119,7 +119,7 @@ export function Upload() {
             <div key={label} className="flex items-center gap-2">
               <div
                 className={
-                  "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold " +
+                  "flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold " +
                   (i === step
                     ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-on-primary)]"
                     : i < step
@@ -248,7 +248,7 @@ export function Upload() {
                   </div>
                 </div>
 
-                <div className="rounded-md border-2 border-[var(--color-border)] bg-black/20 p-4">
+                <div className="rounded-md border border-[var(--color-border)] bg-black/20 p-4">
                   <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-faint)]">Ready to schedule</p>
                   <p className="mt-1 truncate text-sm font-medium">{title || file?.name || "Untitled"}</p>
                   <p className="text-xs text-[var(--color-text-faint)]">{caption ? caption.slice(0, 80) : "No caption yet"}</p>
@@ -266,7 +266,7 @@ export function Upload() {
                       initial={{ opacity: 0, y: -6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
-                      className="flex items-center gap-2 rounded-md border-2 border-[var(--color-success)]/40 bg-[var(--color-success)]/10 px-3.5 py-2.5 text-sm text-[var(--color-success)]"
+                      className="flex items-center gap-2 rounded-md border border-[var(--color-success)]/40 bg-[var(--color-success)]/10 px-3.5 py-2.5 text-sm text-[var(--color-success)]"
                     >
                       <Check className="h-4 w-4" /> "{justUploaded}" scheduled — add the next one below.
                     </motion.div>

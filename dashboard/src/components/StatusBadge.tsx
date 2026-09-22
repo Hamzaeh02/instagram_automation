@@ -14,7 +14,7 @@ export function StatusBadge({ status }: { status: PostStatus }) {
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-md border-2 px-2.5 py-1 text-xs font-bold whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-bold whitespace-nowrap",
         COLOR_CLASSES[color],
       )}
     >

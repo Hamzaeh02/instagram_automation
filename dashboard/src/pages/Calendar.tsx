@@ -136,7 +136,7 @@ export function Calendar() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={
-                "mb-6 flex items-center gap-2.5 rounded-md border-2 px-4 py-3 text-sm " +
+                "mb-6 flex items-center gap-2.5 rounded-md border px-4 py-3 text-sm " +
                 (runState.status === "running"
                   ? "border-[var(--color-border)] bg-white/[0.03] text-[var(--color-text-muted)]"
                   : runState.status === "done"
@@ -169,7 +169,7 @@ export function Calendar() {
             key={f.value}
             onClick={() => setStatusFilter(f.value)}
             className={
-              "rounded-md border-2 px-3 py-1.5 text-xs font-semibold transition " +
+              "rounded-md border px-3 py-1.5 text-xs font-semibold transition " +
               (statusFilter === f.value
                 ? "border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]"
                 : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
@@ -178,7 +178,7 @@ export function Calendar() {
             {f.label}
           </button>
         ))}
-        <div className="ml-auto flex gap-1 rounded-md border-2 border-[var(--color-border)] p-1">
+        <div className="ml-auto flex gap-1 rounded-md border border-[var(--color-border)] p-1">
           {MEDIA_FILTERS.map((f) => (
             <button
               key={f.value}
@@ -220,7 +220,7 @@ export function Calendar() {
             <div className="mb-3 flex items-center justify-between px-1">
               <button
                 onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-                className="rounded-md border-2 border-[var(--color-border)] p-1.5 hover:bg-white/5"
+                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-white/5"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -229,7 +229,7 @@ export function Calendar() {
               </h3>
               <button
                 onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-                className="rounded-md border-2 border-[var(--color-border)] p-1.5 hover:bg-white/5"
+                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-white/5"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -252,7 +252,7 @@ export function Calendar() {
                     key={i}
                     onClick={() => setSelectedDay(d)}
                     className={
-                      "flex aspect-square flex-col items-center justify-start gap-1 rounded-md border-2 p-1.5 text-left transition " +
+                      "flex aspect-square flex-col items-center justify-start gap-1 rounded-md border p-1.5 text-left transition " +
                       (isSelected
                         ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
                         : isToday
@@ -390,7 +390,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   type="button"
                   onClick={() => setContentType("video")}
                   className={
-                    "flex items-center justify-center gap-2 rounded-md border-2 p-3 text-sm font-medium transition " +
+                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
                     (contentType === "video"
                       ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                       : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
@@ -402,7 +402,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   type="button"
                   onClick={() => setContentType("post")}
                   className={
-                    "flex items-center justify-center gap-2 rounded-md border-2 p-3 text-sm font-medium transition " +
+                    "flex items-center justify-center gap-2 rounded-md border p-3 text-sm font-medium transition " +
                     (contentType === "post"
                       ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
                       : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-white/5")
@@ -437,7 +437,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                 max={90}
                 value={days}
                 onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
-                className="w-full rounded-md border-2 border-[var(--color-border)] bg-black/20 px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/30"
+                className="w-full rounded-md border border-[var(--color-border)] bg-black/20 px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/30"
               />
             </div>
 

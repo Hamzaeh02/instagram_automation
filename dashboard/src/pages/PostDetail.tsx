@@ -181,7 +181,7 @@ export function PostDetail() {
 
       {/* Header bar: title + every primary action up front, instead of
           buried at the bottom of a long stacked form. */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-md border-2 border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 py-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 py-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="font-[var(--font-display)] text-xl font-bold">{post.title || "Untitled"}</h1>
@@ -336,7 +336,7 @@ export function PostDetail() {
                     onClick={() => togglePlatform(platform)}
                     title={isConnected ? undefined : `Connect ${meta.label} in Settings first`}
                     className={
-                      "flex items-center gap-1.5 rounded-md border-2 px-3 py-1.5 text-xs font-medium transition " +
+                      "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition " +
                       (!isConnected
                         ? "cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-faint)] opacity-50"
                         : isSelected
@@ -356,7 +356,7 @@ export function PostDetail() {
           {post.publications.length > 0 && (
             <div>
               <Label>Publish history</Label>
-              <div className="space-y-1.5 rounded-md border-2 border-[var(--color-border)] p-4">
+              <div className="space-y-1.5 rounded-md border border-[var(--color-border)] p-4">
                 {post.publications.map((pub) => {
                   const meta = PLATFORM_META[pub.platform]
                   return (
@@ -481,7 +481,7 @@ function GeneratingPanel({ status }: { status: "planned" | "video_generating" | 
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-        className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-[var(--color-border-strong)] bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)]"
+        className="flex h-12 w-12 items-center justify-center rounded-lg border border-[var(--color-border-strong)] bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)]"
       >
         <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
       </motion.div>

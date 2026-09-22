@@ -50,44 +50,36 @@ export function Scene3D() {
       gl={{ antialias: true, alpha: true }}
       style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
     >
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[4, 6, 5]} intensity={1.2} color="#f5f1e6" />
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[4, 6, 5]} intensity={0.7} color="#f0ece2" />
       <Suspense fallback={null}>
         <Grid
           position={[0, -2.4, 0]}
           args={[30, 30]}
           cellSize={0.6}
-          cellThickness={0.6}
-          cellColor="#4a4530"
+          cellThickness={0.5}
+          cellColor="#2a2822"
           sectionSize={3}
-          sectionThickness={1}
-          sectionColor="#d7f43a"
-          fadeDistance={16}
+          sectionThickness={0.7}
+          sectionColor="#3a382f"
+          fadeDistance={14}
           infiniteGrid
         />
         <SpinningShape
-          position={[-1.9, 0.8, 0]}
-          color="#d7f43a"
-          scale={1.35}
-          speed={[0.15, 0.22]}
+          position={[-1.6, 0.6, -1]}
+          color="#4a4740"
+          scale={1.3}
+          speed={[0.08, 0.12]}
           wireframe
           geometry="icosahedron"
         />
         <SpinningShape
-          position={[2.1, -0.4, -2.2]}
-          color="#ff8a3d"
-          scale={1.6}
-          speed={[0.1, 0.16]}
-          wireframe={false}
-          geometry="octahedron"
-        />
-        <SpinningShape
-          position={[0.4, 2.1, -3.5]}
-          color="#f5f1e6"
-          scale={0.9}
-          speed={[0.25, 0.18]}
+          position={[1.8, -0.2, -3]}
+          color="#a9c95e"
+          scale={1.1}
+          speed={[0.06, 0.09]}
           wireframe
-          geometry="torusKnot"
+          geometry="octahedron"
         />
       </Suspense>
     </Canvas>

@@ -19,7 +19,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r-2 border-[var(--color-border-strong)] bg-[var(--color-bg-elevated)]">
         <div className="flex items-center gap-2.5 px-6 py-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-[var(--color-border-strong)] bg-[var(--color-primary)]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-border-strong)] bg-[var(--color-primary)]">
             <Zap className="h-4.5 w-4.5 text-[var(--color-on-primary)]" strokeWidth={2.5} />
           </div>
           <div>
@@ -40,7 +40,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 {active && (
                   <motion.div
                     layoutId="nav-active"
-                    className="absolute inset-0 rounded-md border-2 border-[var(--color-border-strong)] bg-[var(--color-primary)]"
+                    className="absolute inset-0 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-primary)]"
                     transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
                   />
                 )}

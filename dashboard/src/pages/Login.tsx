@@ -38,7 +38,7 @@ export function Login() {
         className="glass-card relative w-full max-w-sm p-8"
       >
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-[4px_4px_0_0_var(--color-border-strong)] border-2 border-[var(--color-border-strong)]">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] border border-[var(--color-border-strong)]">
             <Sparkles className="h-6 w-6 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="font-[var(--font-display)] text-2xl font-bold">Welcome back</h1>
