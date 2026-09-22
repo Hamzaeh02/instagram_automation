@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { CalendarPlus, Check, ChevronLeft, ChevronRight, File as FileIcon, Film, Image as ImageIcon, Sparkles, Upload, X, XCircle } from "lucide-react"
+import { CalendarPlus, Check, ChevronRight, File as FileIcon, Film, Image as ImageIcon, Sparkles, Upload, X, XCircle } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api, ApiError } from "../api/client"
@@ -24,11 +24,6 @@ const MEDIA_FILTERS: { label: string; value: "all" | "REELS" | "IMAGE"; icon: ty
 
 const POLL_MS = 3000
 const POLL_TIMEOUT_MS = 5 * 60 * 1000
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
-function dayKey(d: Date) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-}
 
 export function Calendar() {
   const [posts, setPosts] = useState<Post[] | null>(null)
@@ -36,11 +31,6 @@ export function Calendar() {
   const [mediaFilter, setMediaFilter] = useState<"all" | "REELS" | "IMAGE">("all")
   const [showGenerate, setShowGenerate] = useState(false)
   const [runState, setRunState] = useState<{ status: "running" | "done" | "error"; message?: string } | null>(null)
-  const [month, setMonth] = useState(() => {
-    const d = new Date()
-    return new Date(d.getFullYear(), d.getMonth(), 1)
-  })
-  const [selectedDay, setSelectedDay] = useState<Date>(() => new Date())
   const pollRef = useRef<number | null>(null)
 
   async function load() {
@@ -90,30 +80,18 @@ export function Calendar() {
       .filter((p) => mediaFilter === "all" || p.media_type === mediaFilter)
   }, [posts, statusFilter, mediaFilter])
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, Post[]>()
+  const grouped = useMemo(() => {
+    const groups = new Map<string, Post[]>()
     for (const post of filtered) {
-      const key = dayKey(new Date(post.scheduled_at))
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(post)
+      const month = new Date(post.scheduled_at).toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      })
+      if (!groups.has(month)) groups.set(month, [])
+      groups.get(month)!.push(post)
     }
-    return map
+    return Array.from(groups.entries())
   }, [filtered])
-
-  const grid = useMemo(() => {
-    const firstWeekday = month.getDay()
-    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
-    const cells: (Date | null)[] = []
-    for (let i = 0; i < firstWeekday; i++) cells.push(null)
-    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d))
-    while (cells.length % 7 !== 0) cells.push(null)
-    return cells
-  }, [month])
-
-  const dayPosts = (byDay.get(dayKey(selectedDay)) ?? []).sort(
-    (a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime(),
-  )
-  const today = new Date()
 
   return (
     <div className="section-calendar">
@@ -214,118 +192,59 @@ export function Calendar() {
         </Card>
       )}
 
-      {posts && posts.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-          <div className="glass-card p-4 lg:col-span-3">
-            <div className="mb-3 flex items-center justify-between px-1">
-              <button
-                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-black/5"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <h3 className="font-[var(--font-display)] font-bold">
-                {month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-              </h3>
-              <button
-                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-                className="rounded-md border border-[var(--color-border)] p-1.5 hover:bg-black/5"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+      {posts && posts.length > 0 && filtered.length === 0 && (
+        <Card className="py-16 text-center">
+          <p className="text-sm text-[var(--color-text-muted)]">Nothing matches these filters yet.</p>
+        </Card>
+      )}
 
-            <div className="grid grid-cols-7 gap-1.5 px-1 pb-1.5 text-center text-[10px] font-bold uppercase text-[var(--color-text-faint)]">
-              {WEEKDAYS.map((w) => (
-                <div key={w}>{w}</div>
+      <div className="space-y-8">
+        {grouped.map(([month, monthPosts]) => (
+          <div key={month}>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-faint)]">
+              {month}
+            </h3>
+            <div className="space-y-2">
+              {monthPosts.map((post, i) => (
+                <FadeIn key={post.id} delay={Math.min(i * 0.03, 0.3)}>
+                  <Link to={`/posts/${post.id}`}>
+                    <motion.div
+                      whileHover={{ x: 3 }}
+                      className="glass-card flex items-center gap-4 px-5 py-4 transition-colors hover:border-[var(--color-border-strong)]"
+                    >
+                      <div className="w-16 shrink-0 text-center">
+                        <div className="text-lg font-bold leading-none">
+                          {new Date(post.scheduled_at).getDate()}
+                        </div>
+                        <div className="mt-1 text-[10px] uppercase text-[var(--color-text-faint)]">
+                          {new Date(post.scheduled_at).toLocaleDateString(undefined, { weekday: "short" })}
+                        </div>
+                      </div>
+                      {post.media_type === "REELS" ? (
+                        <Film className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                      ) : (
+                        <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{post.title || "Untitled"}</div>
+                        <div className="truncate text-xs text-[var(--color-text-faint)]">
+                          {new Date(post.scheduled_at).toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}{" "}
+                          · {post.pillar}
+                        </div>
+                      </div>
+                      <StatusBadge status={post.status} />
+                      <ChevronRight className="h-4 w-4 text-[var(--color-text-faint)]" />
+                    </motion.div>
+                  </Link>
+                </FadeIn>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1.5">
-              {grid.map((d, i) => {
-                if (!d) return <div key={i} />
-                const key = dayKey(d)
-                const dayItems = byDay.get(key) ?? []
-                const isToday = dayKey(today) === key
-                const isSelected = dayKey(selectedDay) === key
-                return (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedDay(d)}
-                    className={
-                      "flex aspect-square flex-col items-center justify-start gap-1 rounded-md border p-1.5 text-left transition " +
-                      (isSelected
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
-                        : isToday
-                          ? "border-[var(--color-border-strong)]"
-                          : "border-[var(--color-border)] hover:bg-black/5")
-                    }
-                  >
-                    <span className={"text-xs font-semibold " + (isToday ? "text-[var(--color-primary)]" : "")}>
-                      {d.getDate()}
-                    </span>
-                    <div className="flex flex-wrap justify-center gap-0.5">
-                      {dayItems.slice(0, 4).map((p) => (
-                        <span
-                          key={p.id}
-                          className={
-                            "h-1.5 w-1.5 rounded-full " +
-                            (p.status === "posted"
-                              ? "bg-[var(--color-success)]"
-                              : p.status === "needs_manual_edit"
-                                ? "bg-[var(--color-danger)]"
-                                : "bg-[var(--color-primary)]")
-                          }
-                        />
-                      ))}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
           </div>
-
-          <div className="lg:col-span-2">
-            <h3 className="mb-3 font-[var(--font-display)] text-sm font-bold">
-              {selectedDay.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-            </h3>
-            {dayPosts.length === 0 ? (
-              <div className="glass-card panel-strip px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
-                Nothing scheduled this day.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {dayPosts.map((post, i) => (
-                  <FadeIn key={post.id} delay={Math.min(i * 0.03, 0.3)}>
-                    <Link to={`/posts/${post.id}`}>
-                      <motion.div
-                        whileHover={{ x: 3 }}
-                        className="glass-card panel-strip flex items-center gap-3 px-4 py-3 transition-colors hover:border-[var(--color-border-strong)]"
-                      >
-                        {post.media_type === "REELS" ? (
-                          <Film className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
-                        ) : (
-                          <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-faint)]" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">{post.title || "Untitled"}</div>
-                          <div className="truncate text-xs text-[var(--color-text-faint)]">
-                            {new Date(post.scheduled_at).toLocaleTimeString(undefined, {
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}{" "}
-                            · {post.pillar}
-                          </div>
-                        </div>
-                        <StatusBadge status={post.status} />
-                      </motion.div>
-                    </Link>
-                  </FadeIn>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       <GenerateModal
         open={showGenerate}
