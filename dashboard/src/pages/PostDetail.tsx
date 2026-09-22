@@ -240,16 +240,19 @@ export function PostDetail() {
         </FadeIn>
       )}
 
-      {/* Media as a full-width top banner instead of a dominant side column. */}
-      <div className="panel-ribbon glass-card mb-6 overflow-hidden p-0">
+      {/* Media as a top banner instead of a dominant side column - sized to
+          the media's own aspect ratio (mostly portrait 9:16 Reels) rather
+          than stretched full-width, which just letterboxed it with huge
+          black bars on either side. */}
+      <div className="panel-ribbon glass-card mx-auto mb-6 w-fit overflow-hidden p-0">
         {post.has_video && post.media_type === "IMAGE" ? (
-          <img className="h-72 w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
+          <img className="h-96 w-auto max-w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
         ) : post.has_video ? (
-          <video controls className="h-72 w-full bg-black" src={`/api/posts/${post.id}/video`} />
+          <video controls className="h-96 w-auto max-w-full bg-black" src={`/api/posts/${post.id}/video`} />
         ) : post.status === "planned" || post.status === "video_generating" || post.status === "image_generating" ? (
           <GeneratingPanel status={post.status} />
         ) : (
-          <div className="flex h-40 w-full items-center justify-center text-sm text-[var(--color-text-faint)]">
+          <div className="flex h-40 w-72 items-center justify-center text-sm text-[var(--color-text-faint)]">
             No video for this post
           </div>
         )}
@@ -477,7 +480,7 @@ function GeneratingPanel({ status }: { status: "planned" | "video_generating" | 
       ? "Searching stock photos for a match — usually just a few seconds."
       : "Voiceover, footage, and captions are being put together — usually a minute or two."
   return (
-    <div className="flex h-72 w-full flex-col items-center justify-center gap-5 p-8 text-center">
+    <div className="flex h-96 w-72 flex-col items-center justify-center gap-5 p-8 text-center">
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
