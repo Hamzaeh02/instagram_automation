@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { CalendarPlus, Check, ChevronLeft, ChevronRight, Film, Image as ImageIcon, Sparkles, XCircle } from "lucide-react"
+import { CalendarPlus, Check, ChevronLeft, ChevronRight, File as FileIcon, Film, Image as ImageIcon, Sparkles, Upload, X, XCircle } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { api, ApiError } from "../api/client"
@@ -339,20 +339,30 @@ export function Calendar() {
   )
 }
 
+const DOCUMENT_ACCEPT = ".txt,.md,.pdf,.docx"
+
 function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted: () => void }) {
   const [contentType, setContentType] = useState<"video" | "post">("video")
   const [brief, setBrief] = useState("")
+  const [docFile, setDocFile] = useState<File | null>(null)
   const [days, setDays] = useState(90)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function start() {
-    if (!brief.trim()) return
+    if (!brief.trim() && !docFile) return
     setStarting(true)
     setError(null)
     try {
-      await api.post("/calendar/generate", { days, content_type: contentType, brief: brief.trim() })
+      const formData = new FormData()
+      formData.append("days", String(days))
+      formData.append("content_type", contentType)
+      formData.append("brief", brief.trim())
+      if (docFile) formData.append("document", docFile)
+      await api.upload("/calendar/generate", formData)
       setBrief("")
+      setDocFile(null)
       onStarted()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't start generating")
@@ -380,7 +390,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
           >
             <h3 className="font-[var(--font-display)] text-lg font-bold">Generate content</h3>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Tell us what this run should be about — the strategy engine writes and schedules it for you.
+              Describe it, upload a document, or both — the strategy engine writes and schedules it for you.
             </p>
 
             <div className="mt-5">
@@ -429,6 +439,44 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
               />
             </div>
 
+            <div className="mt-5">
+              <Label>Or upload a document (optional)</Label>
+              <p className="-mt-1 mb-2 text-[11px] text-[var(--color-text-faint)]">
+                A business plan, brand brief, or style guide — it'll be analyzed and folded into the brief above.
+              </p>
+              {docFile ? (
+                <div className="flex items-center gap-2.5 rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5">
+                  <FileIcon className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
+                  <span className="min-w-0 flex-1 truncate text-sm">{docFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocFile(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ""
+                    }}
+                    className="shrink-0 rounded-md p-1 text-[var(--color-text-faint)] hover:bg-black/5 hover:text-[var(--color-text)]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-[var(--color-border-strong)] px-3.5 py-3 text-sm text-[var(--color-text-muted)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-text)]"
+                >
+                  <Upload className="h-4 w-4" /> Choose a .txt, .pdf, or .docx file
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={DOCUMENT_ACCEPT}
+                className="hidden"
+                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+
             <div className="mt-5 w-32">
               <Label>Days to plan</Label>
               <input
@@ -447,7 +495,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
               <Button variant="ghost" onClick={onClose} disabled={starting}>
                 Cancel
               </Button>
-              <Button onClick={start} disabled={starting || !brief.trim()}>
+              <Button onClick={start} disabled={starting || (!brief.trim() && !docFile)}>
                 {starting ? <Spinner className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
                 {starting ? "Starting…" : "Generate"}
               </Button>

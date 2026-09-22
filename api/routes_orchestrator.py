@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 
 from api.auth import require_auth
@@ -13,6 +12,7 @@ from common.timeutil import utc_iso
 from db.models import RunLog, User
 from db.session import get_session
 from orchestrator.daily import run_once_for_user
+from strategy.document_text import DocumentTextError, extract_text, summarize_for_content_strategy
 from strategy.generate_calendar import generate_calendar
 
 logger = get_logger(__name__)
@@ -32,14 +32,9 @@ def _run_safely(user_id: int) -> None:
         logger.exception("Manually triggered orchestrator run failed for user %s", user_id)
 
 
-class GenerateCalendarRequest(BaseModel):
-    start_date: str | None = None
-    days: int = 90
-    content_type: str = "video"  # "video" (Reels) or "post" (stock-photo posts)
-    brief: str = ""  # creator's own description of what this run should cover
-
-
-def _generate_calendar_safely(user_id: int, start: dt.date, days: int, content_type: str, brief: str) -> None:
+def _generate_calendar_safely(
+    user_id: int, start: dt.date, days: int, content_type: str, brief: str, document_text: str = ""
+) -> None:
     # Calendar generation makes several sequential LLM calls and can easily
     # take 30-90+ seconds for a 90-day window - running it inline on the
     # request would hold the HTTP connection open that whole time (fragile:
@@ -54,11 +49,21 @@ def _generate_calendar_safely(user_id: int, start: dt.date, days: int, content_t
         brand = get_profile(session, user_id)
         if not brand or not brand.niche:
             raise ValueError("Brand profile isn't set up")
-        created = generate_calendar(session, brand, user_id, start, days, content_type=content_type, brief=brief)
+
+        full_brief = brief
+        if document_text:
+            run.summary = "Analyzing your document…"
+            session.commit()
+            doc_summary = summarize_for_content_strategy(document_text)
+            full_brief = f"{brief}\n\n{doc_summary}".strip() if brief else doc_summary
+            run.summary = "Generating content calendar…"
+            session.commit()
+
+        created = generate_calendar(session, brand, user_id, start, days, content_type=content_type, brief=full_brief)
         # Remembered so the automatic refill (ensure_calendar_filled) keeps
         # generating the same kind of content as this run without asking again.
         brand.content_type = content_type
-        brand.content_brief = brief
+        brand.content_brief = full_brief
         session.commit()
         run.status = "ok"
         run.summary = f"Generated {len(created)} new post(s)."
@@ -73,13 +78,28 @@ def _generate_calendar_safely(user_id: int, start: dt.date, days: int, content_t
 
 
 @router.post("/calendar/generate")
-def trigger_calendar_generation(
-    body: GenerateCalendarRequest, background_tasks: BackgroundTasks, user: User = Depends(require_auth)
+async def trigger_calendar_generation(
+    background_tasks: BackgroundTasks,
+    days: int = Form(90),
+    content_type: str = Form("video"),  # "video" (Reels) or "post" (stock-photo posts)
+    brief: str = Form(""),  # creator's own description of what this run should cover
+    start_date: str | None = Form(None),
+    document: UploadFile | None = File(None),
+    user: User = Depends(require_auth),
 ):
-    if body.content_type not in ("video", "post"):
+    if content_type not in ("video", "post"):
         raise HTTPException(status_code=400, detail="content_type must be 'video' or 'post'")
-    if not body.brief.strip():
-        raise HTTPException(status_code=400, detail="Describe what this content run should be about")
+
+    document_text = ""
+    if document is not None and document.filename:
+        raw = await document.read()
+        try:
+            document_text = extract_text(document.filename, raw)
+        except DocumentTextError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not brief.strip() and not document_text:
+        raise HTTPException(status_code=400, detail="Describe what this content run should be about, or upload a document")
 
     session = get_session()
     try:
@@ -89,8 +109,10 @@ def trigger_calendar_generation(
     finally:
         session.close()
 
-    start = dt.date.fromisoformat(body.start_date) if body.start_date else dt.date.today()
-    background_tasks.add_task(_generate_calendar_safely, user.id, start, body.days, body.content_type, body.brief.strip())
+    start = dt.date.fromisoformat(start_date) if start_date else dt.date.today()
+    background_tasks.add_task(
+        _generate_calendar_safely, user.id, start, days, content_type, brief.strip(), document_text
+    )
     return {"started": True}
 
 
