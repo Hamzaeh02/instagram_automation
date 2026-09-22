@@ -422,13 +422,23 @@ export function Calendar() {
 
 const DOCUMENT_ACCEPT = ".txt,.md,.pdf,.docx"
 
+interface PlanItem {
+  scheduled_date: string
+  pillar: string
+  hook: string
+  description: string
+}
+
 function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted: () => void }) {
   const [phase, setPhase] = useState<"input" | "review">("input")
   const [contentType, setContentType] = useState<"video" | "post">("video")
   const [brief, setBrief] = useState("")
   const [docFile, setDocFile] = useState<File | null>(null)
   const [days, setDays] = useState(90)
-  const [summary, setSummary] = useState("")
+  const [outline, setOutline] = useState<PlanItem[]>([])
+  const [resolvedBrief, setResolvedBrief] = useState("")
+  const [amendment, setAmendment] = useState("")
+  const [amending, setAmending] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -438,7 +448,9 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
     setPhase("input")
     setBrief("")
     setDocFile(null)
-    setSummary("")
+    setOutline([])
+    setResolvedBrief("")
+    setAmendment("")
     setError(null)
   }
 
@@ -448,10 +460,13 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
     setError(null)
     try {
       const formData = new FormData()
+      formData.append("days", String(days))
+      formData.append("content_type", contentType)
       formData.append("brief", brief.trim())
       if (docFile) formData.append("document", docFile)
-      const res = await api.upload<{ summary: string }>("/calendar/analyze", formData)
-      setSummary(res.summary)
+      const res = await api.upload<{ outline: PlanItem[]; brief: string }>("/calendar/analyze", formData)
+      setOutline(res.outline)
+      setResolvedBrief(res.brief)
       setPhase("review")
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't analyze that")
@@ -460,15 +475,35 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
     }
   }
 
+  async function applyAmendment() {
+    if (!amendment.trim() || outline.length === 0) return
+    setAmending(true)
+    setError(null)
+    try {
+      const formData = new FormData()
+      formData.append("outline", JSON.stringify(outline))
+      formData.append("amendment", amendment.trim())
+      formData.append("brief", resolvedBrief)
+      const res = await api.upload<{ outline: PlanItem[]; brief: string }>("/calendar/analyze", formData)
+      setOutline(res.outline)
+      setAmendment("")
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't apply that change")
+    } finally {
+      setAmending(false)
+    }
+  }
+
   async function start() {
-    if (!summary.trim()) return
+    if (outline.length === 0) return
     setStarting(true)
     setError(null)
     try {
       const formData = new FormData()
       formData.append("days", String(days))
       formData.append("content_type", contentType)
-      formData.append("brief", summary.trim())
+      formData.append("brief", resolvedBrief)
+      formData.append("outline", JSON.stringify(outline))
       await api.upload("/calendar/generate", formData)
       reset()
       onStarted()
@@ -494,7 +529,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
             onClick={(e) => e.stopPropagation()}
-            className="glass-card w-full max-w-lg p-6"
+            className={"glass-card w-full p-6 " + (phase === "review" ? "max-w-2xl" : "max-w-lg")}
           >
             {phase === "input" ? (
               <>
@@ -614,48 +649,69 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
               </>
             ) : (
               <>
-                <h3 className="font-[var(--font-display)] text-lg font-bold">Review before generating</h3>
+                <h3 className="font-[var(--font-display)] text-lg font-bold">Review your plan</h3>
                 <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  Here's what we understood — edit anything, then we'll plan {days} day{days === 1 ? "" : "s"} of{" "}
-                  {contentType === "video" ? "Reels" : "posts"} around it.
+                  {outline.length} post{outline.length === 1 ? "" : "s"} over {days} day{days === 1 ? "" : "s"},
+                  matching your posting frequency. Don't like something? Say so below and we'll adjust it.
                 </p>
 
-                <div className="mt-5">
-                  <Label>Content plan brief</Label>
-                  <Textarea
-                    autoFocus
-                    rows={9}
-                    value={summary}
-                    onChange={(e) => setSummary(e.target.value)}
-                    className="font-mono text-[13px] leading-relaxed"
-                  />
+                <div className="mt-4 max-h-[22rem] space-y-2 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
+                  {outline.map((item, i) => (
+                    <div key={item.scheduled_date + i} className="rounded-md border border-[var(--color-border)] bg-black/[0.02] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-[var(--color-primary)]">
+                          Day {i + 1} ·{" "}
+                          {new Date(item.scheduled_date).toLocaleDateString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                        {item.pillar && (
+                          <span className="shrink-0 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
+                            {item.pillar}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold">{item.hook}</div>
+                      <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{item.description}</div>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="mt-5 w-32">
-                  <Label>Days to plan</Label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={days}
-                    onChange={(e) => setDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
-                    className="w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]"
-                  />
+                <div className="mt-4">
+                  <Label>Want to change something?</Label>
+                  <div className="flex gap-2">
+                    <Textarea
+                      rows={2}
+                      placeholder="e.g. Make day 3 about client testimonials instead, or add more myth-busting days"
+                      value={amendment}
+                      onChange={(e) => setAmendment(e.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={applyAmendment}
+                      disabled={amending || !amendment.trim()}
+                      className="shrink-0 self-start"
+                    >
+                      {amending ? <Spinner className="h-4 w-4" /> : "Apply"}
+                    </Button>
+                  </div>
                 </div>
 
                 {error && <p className="mt-4 text-sm text-[var(--color-danger)]">{error}</p>}
 
                 <div className="mt-6 flex items-center justify-between gap-3">
-                  <Button variant="ghost" onClick={() => setPhase("input")} disabled={starting}>
+                  <Button variant="ghost" onClick={() => setPhase("input")} disabled={starting || amending}>
                     <ArrowLeft className="h-4 w-4" /> Back
                   </Button>
                   <div className="flex gap-3">
                     <Button variant="ghost" onClick={onClose} disabled={starting}>
                       Cancel
                     </Button>
-                    <Button onClick={start} disabled={starting || !summary.trim()}>
+                    <Button onClick={start} disabled={starting || amending || outline.length === 0}>
                       {starting ? <Spinner className="h-4 w-4" /> : <CalendarPlus className="h-4 w-4" />}
-                      {starting ? "Starting…" : "Generate"}
+                      {starting ? "Starting…" : `Generate ${outline.length} post${outline.length === 1 ? "" : "s"}`}
                     </Button>
                   </div>
                 </div>

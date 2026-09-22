@@ -25,6 +25,13 @@ def extract_json_object(text: str) -> dict:
     return json.loads(match.group(0))
 
 
+def extract_json_array(text: str) -> list[dict]:
+    match = re.search(r"\[.*\]", text, re.DOTALL)
+    if not match:
+        raise ValueError(f"No JSON array found in model response:\n{text[:500]}")
+    return json.loads(match.group(0))
+
+
 def _call_anthropic(prompt: str) -> str:
     from anthropic import Anthropic
 

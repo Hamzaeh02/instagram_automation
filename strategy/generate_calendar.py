@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import re
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -10,7 +9,7 @@ from sqlalchemy.orm import Session
 from common.logging import get_logger
 from common.platforms import connected_platforms
 from db.models import BrandProfile, Post, PostStatus
-from strategy.llm import extract_json_object, generate_text
+from strategy.llm import extract_json_array, extract_json_object, generate_text
 
 logger = get_logger(__name__)
 
@@ -46,11 +45,78 @@ def compute_schedule_dates(
     return dates
 
 
-def _extract_json_array(text: str) -> list[dict]:
-    match = re.search(r"\[.*\]", text, re.DOTALL)
-    if not match:
-        raise ValueError(f"No JSON array found in model response:\n{text[:500]}")
-    return json.loads(match.group(0))
+def _format_dates_for_prompt(dates: list[dt.date]) -> str:
+    return "\n".join(f"- Day {i + 1}: {d.isoformat()} ({d.strftime('%A')})" for i, d in enumerate(dates))
+
+
+def build_outline_prompt(brand: BrandProfile, dates: list[dt.date], content_type: str, context: str) -> str:
+    pillars = ", ".join(brand.content_pillars) or "general"
+    banned = ", ".join(brand.banned_topics) or "none"
+    format_desc = "static Instagram feed posts (photo + caption)" if content_type == "post" else "Instagram Reels (short vertical video)"
+    context_line = f'\nWhat this run should cover: "{context}"\n' if context.strip() else ""
+
+    return f"""You are a social media strategist planning {format_desc} for this brand. This is a PLANNING
+pass, not final content - produce a concrete, specific day-by-day outline the creator will review
+and can request changes to before anything gets written in full.
+
+Brand: {brand.brand_name}
+Niche: {brand.niche}
+Audience: {brand.audience}
+Tone of voice: {brand.tone}
+Content pillars to rotate through: {pillars}
+Banned topics (never mention): {banned}
+{context_line}
+Plan ONE concept for EACH of these {len(dates)} posting days:
+{_format_dates_for_prompt(dates)}
+
+Return ONLY a JSON array (no prose, no markdown fences), one object per day, in this exact shape:
+[
+  {{
+    "scheduled_date": "YYYY-MM-DD",
+    "pillar": "which content pillar this belongs to",
+    "hook": "the specific hook/headline for this day - concrete and scroll-stopping, not a generic placeholder",
+    "description": "2-3 sentences describing exactly what this post covers and the angle it takes - specific enough that someone could write the full script/caption from it alone"
+  }}
+]
+
+Make each day genuinely distinct - no two days should feel interchangeable - and ensure variety
+across pillars. Strictly avoid the banned topics."""
+
+
+def generate_plan_outline(
+    brand: BrandProfile, start_date: dt.date, num_days: int, content_type: str, context: str
+) -> list[dict]:
+    """Produces a concrete day-by-day content outline (not final posts) for
+    the creator to review and amend before anything is actually written -
+    the dates come from the brand's own posting cadence, same as the real
+    generation run will use, so what's reviewed here is what will exist."""
+    dates = compute_schedule_dates(start_date, num_days, brand.posting_cadence_per_week)
+    if not dates:
+        raise ValueError("Posting cadence is 0 - set a posting frequency in your brand profile first")
+    text = generate_text(build_outline_prompt(brand, dates, content_type, context))
+    return extract_json_array(text)
+
+
+def revise_plan_outline(brand: BrandProfile, outline: list[dict], amendment: str) -> list[dict]:
+    """Revises an already-generated outline based on free-text feedback (e.g.
+    "make day 3 about client testimonials instead") - the same conversational
+    amend loop the creator can keep using until the plan looks right."""
+    banned = ", ".join(brand.banned_topics) or "none"
+    prompt = f"""You are revising an existing day-by-day social media content plan based on feedback.
+
+Current plan (JSON):
+{json.dumps(outline, indent=2)}
+
+The creator's requested change:
+"{amendment}"
+
+Apply ONLY the requested change - leave every other day exactly as it was unless the change
+logically requires touching them too. Keep the same dates, the same number of entries, and the
+same JSON shape (scheduled_date, pillar, hook, description). Banned topics (never mention): {banned}.
+
+Return ONLY the full revised JSON array, no prose, no markdown fences."""
+    text = generate_text(prompt)
+    return extract_json_array(text)
 
 
 def _build_prompt(
@@ -59,6 +125,7 @@ def _build_prompt(
     recent_hooks: list[str],
     content_type: str,
     brief: str,
+    outline_map: dict[str, dict] | None = None,
 ) -> str:
     pillars = ", ".join(brand.content_pillars) or "general"
     banned = ", ".join(brand.banned_topics) or "none"
@@ -68,6 +135,21 @@ def _build_prompt(
         if brief.strip()
         else ""
     )
+
+    plan_line = ""
+    if outline_map:
+        plan_items = [outline_map[d.isoformat()] for d in dates if d.isoformat() in outline_map]
+        if plan_items:
+            plan_rows = "\n".join(
+                f'- {item["scheduled_date"]}: pillar="{item.get("pillar", "")}", hook="{item.get("hook", "")}", '
+                f'direction="{item.get("description", "")}"'
+                for item in plan_items
+            )
+            plan_line = (
+                "\nThe creator already reviewed and approved a specific plan for each date below - write the "
+                "FULL post so it matches that plan exactly (same hook, same pillar, covering exactly what the "
+                "direction describes). Do not invent a different topic for these dates:\n" + plan_rows + "\n"
+            )
 
     if content_type == "post":
         format_desc = "static Instagram feed posts (a single stock photo + caption, no video)"
@@ -108,7 +190,7 @@ Content pillars to rotate through: {pillars}
 Banned topics (never mention): {banned}
 Call-to-action style: {brand.cta_style or "encourage engagement"}
 Hashtag style: {brand.hashtag_style or "8-12 relevant hashtags, mix of broad and niche"}
-{brief_line}
+{brief_line}{plan_line}
 Hooks already used recently (do not repeat these or anything too similar):
 {recent}
 
@@ -130,11 +212,16 @@ def generate_calendar(
     num_days: int = 90,
     content_type: str = "video",
     brief: str = "",
+    outline: list[dict] | None = None,
 ) -> list[Post]:
     """Generate a content calendar for the given window and persist new Post
     rows for this user. Idempotent: dates that already have a Post row for
     this user are skipped. content_type is "video" (Reels, via the broll/TTS
-    pipeline) or "post" (a single stock photo per date)."""
+    pipeline) or "post" (a single stock photo per date). If `outline` is
+    given (from generate_plan_outline/revise_plan_outline, keyed by
+    scheduled_date), each date's full post is written to match that
+    already-reviewed plan instead of being improvised fresh from `brief`."""
+    outline_map = {item["scheduled_date"]: item for item in outline} if outline else None
     all_dates = compute_schedule_dates(start_date, num_days, brand.posting_cadence_per_week)
 
     existing_dates = set(
@@ -167,9 +254,9 @@ def generate_calendar(
         batch_dates = pending_dates[i : i + BATCH_SIZE]
         logger.info("Generating calendar batch for %s dates starting %s", len(batch_dates), batch_dates[0])
 
-        prompt = _build_prompt(brand, batch_dates, recent_hooks, content_type, brief)
+        prompt = _build_prompt(brand, batch_dates, recent_hooks, content_type, brief, outline_map)
         text = generate_text(prompt)
-        items = _extract_json_array(text)
+        items = extract_json_array(text)
 
         for item in items:
             post = Post(
