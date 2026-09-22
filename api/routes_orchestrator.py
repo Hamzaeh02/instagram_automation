@@ -119,7 +119,7 @@ async def analyze_calendar_brief(
         except (TypeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail="Invalid plan") from exc
         try:
-            revised = revise_plan_outline(brand, current_outline, amendment.strip())
+            revised = revise_plan_outline(brand, current_outline, amendment.strip(), content_type)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Couldn't apply that change: {exc}") from exc
         return {"outline": revised, "brief": brief}

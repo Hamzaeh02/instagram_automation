@@ -49,15 +49,51 @@ def _format_dates_for_prompt(dates: list[dt.date]) -> str:
     return "\n".join(f"- Day {i + 1}: {d.isoformat()} ({d.strftime('%A')})" for i, d in enumerate(dates))
 
 
+def _post_shape(content_type: str) -> tuple[str, str]:
+    """The full per-post JSON shape, shared by outline generation, outline
+    revision, and final batch generation - there's only one shape now, since
+    the outline IS the final content (see generate_plan_outline)."""
+    if content_type == "post":
+        format_desc = "static Instagram feed posts (a single stock photo + caption, no video)"
+        shape = """{
+    "scheduled_date": "YYYY-MM-DD",
+    "pillar": "which content pillar this belongs to",
+    "hook": "the first line of the caption - must stop the scroll and earn the read, no generic throat-clearing",
+    "video_concept": "a precise, production-ready visual description of the exact photo/scene to generate: subject, setting, framing, lighting, mood, style - specific enough that a text-to-image/video AI tool could act on it directly, not a vague idea",
+    "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
+    "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
+    "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
+    "broll_keywords": "3-5 comma-separated stock-photo search terms (concrete, visual, searchable on a stock photo site) that match this post, most important first"
+  }"""
+    else:
+        format_desc = "Instagram Reels (short vertical video)"
+        shape = """{
+    "scheduled_date": "YYYY-MM-DD",
+    "pillar": "which content pillar this belongs to",
+    "hook": "the opening line/hook, first 1-2 seconds of the video - must stop the scroll, earn the next second of attention, no generic throat-clearing",
+    "video_concept": "a precise, production-ready shot-by-shot description of exactly what the video shows: scenes/shots in order, camera framing and movement, on-screen action, visual style and mood - specific enough that a text-to-video AI generation tool could act on it directly, not a vague one-liner",
+    "script": "full voiceover script, natural spoken language, 30-60 seconds when read aloud, conversational not corporate",
+    "on_screen_text": "the actual on-screen text overlays/key beats in the order they should appear, or empty string if none",
+    "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
+    "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
+    "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
+    "broll_keywords": "3-5 comma-separated stock-footage search terms (concrete, visual, searchable on a stock video site) that match this script's content, in the order they should appear"
+  }"""
+    return format_desc, shape
+
+
 def build_outline_prompt(brand: BrandProfile, dates: list[dt.date], content_type: str, context: str) -> str:
     pillars = ", ".join(brand.content_pillars) or "general"
     banned = ", ".join(brand.banned_topics) or "none"
-    format_desc = "static Instagram feed posts (photo + caption)" if content_type == "post" else "Instagram Reels (short vertical video)"
-    context_line = f'\nWhat this run should cover: "{context}"\n' if context.strip() else ""
+    format_desc, shape = _post_shape(content_type)
+    context_line = f'\nWhat this run should cover, in the creator\'s own words or from their uploaded document: "{context}"\n' if context.strip() else ""
 
-    return f"""You are a social media strategist planning {format_desc} for this brand. This is a PLANNING
-pass, not final content - produce a concrete, specific day-by-day outline the creator will review
-and can request changes to before anything gets written in full.
+    return f"""You are a senior social media content strategist and video producer planning {format_desc}
+for this brand. Write like you're briefing a production team, not brainstorming ideas - every
+field below must be precise and complete enough to hand straight to an AI video/image generation
+tool and a human editor with no follow-up questions. This is reviewed by the creator before
+anything is scheduled, but what you write here IS the final content if approved as-is - there is
+no second draft pass, so do not hold back detail expecting it to be filled in later.
 
 Brand: {brand.brand_name}
 Niche: {brand.niche}
@@ -65,31 +101,36 @@ Audience: {brand.audience}
 Tone of voice: {brand.tone}
 Content pillars to rotate through: {pillars}
 Banned topics (never mention): {banned}
+Call-to-action style: {brand.cta_style or "encourage engagement"}
+Hashtag style: {brand.hashtag_style or "8-12 relevant hashtags, mix of broad and niche"}
 {context_line}
-Plan ONE concept for EACH of these {len(dates)} posting days:
+Ground every day in the specifics above wherever they give you real material (concrete facts,
+products, projects, positioning) - don't drift into generic industry topics that could apply to
+any brand in this niche. If what's given is thin, vague, or low-quality, don't just reflect that
+weakness back - use your own expertise to strengthen and fill it in with something specific and
+professional, the way a senior strategist would rescue a rough client brief.
+
+Plan ONE full post for EACH of these {len(dates)} posting days:
 {_format_dates_for_prompt(dates)}
 
 Return ONLY a JSON array (no prose, no markdown fences), one object per day, in this exact shape:
 [
-  {{
-    "scheduled_date": "YYYY-MM-DD",
-    "pillar": "which content pillar this belongs to",
-    "hook": "the specific hook/headline for this day - concrete and scroll-stopping, not a generic placeholder",
-    "description": "2-3 sentences describing exactly what this post covers and the angle it takes - specific enough that someone could write the full script/caption from it alone"
-  }}
+  {shape}
 ]
 
-Make each day genuinely distinct - no two days should feel interchangeable - and ensure variety
-across pillars. Strictly avoid the banned topics."""
+Make each day genuinely distinct - no two days should feel interchangeable, and no two days
+should share a hook or video_concept - and ensure variety across pillars. Strictly avoid the
+banned topics."""
 
 
 def generate_plan_outline(
     brand: BrandProfile, start_date: dt.date, num_days: int, content_type: str, context: str
 ) -> list[dict]:
-    """Produces a concrete day-by-day content outline (not final posts) for
-    the creator to review and amend before anything is actually written -
-    the dates come from the brand's own posting cadence, same as the real
-    generation run will use, so what's reviewed here is what will exist."""
+    """Produces the actual day-by-day content - full posts, not placeholders -
+    for the creator to review and amend before anything is scheduled. The
+    dates come from the brand's own posting cadence, same as the real
+    generation run will use, so what's reviewed here is what will exist:
+    generate_calendar persists these entries directly with no rewrite pass."""
     dates = compute_schedule_dates(start_date, num_days, brand.posting_cadence_per_week)
     if not dates:
         raise ValueError("Posting cadence is 0 - set a posting frequency in your brand profile first")
@@ -97,12 +138,17 @@ def generate_plan_outline(
     return extract_json_array(text)
 
 
-def revise_plan_outline(brand: BrandProfile, outline: list[dict], amendment: str) -> list[dict]:
-    """Revises an already-generated outline based on free-text feedback (e.g.
+def revise_plan_outline(brand: BrandProfile, outline: list[dict], amendment: str, content_type: str = "video") -> list[dict]:
+    """Revises an already-generated plan based on free-text feedback (e.g.
     "make day 3 about client testimonials instead") - the same conversational
-    amend loop the creator can keep using until the plan looks right."""
+    amend loop the creator can keep using until the plan looks right. Applies
+    the same senior-strategist bar as the initial plan: if the amendment
+    itself is vague, still produce something specific and production-ready."""
     banned = ", ".join(brand.banned_topics) or "none"
-    prompt = f"""You are revising an existing day-by-day social media content plan based on feedback.
+    _, shape = _post_shape(content_type)
+    prompt = f"""You are a senior social media content strategist revising an existing day-by-day content
+plan based on feedback. Every field must stay precise and production-ready - this is the final
+content if approved, not a draft that gets rewritten later.
 
 Current plan (JSON):
 {json.dumps(outline, indent=2)}
@@ -110,9 +156,13 @@ Current plan (JSON):
 The creator's requested change:
 "{amendment}"
 
-Apply ONLY the requested change - leave every other day exactly as it was unless the change
-logically requires touching them too. Keep the same dates, the same number of entries, and the
-same JSON shape (scheduled_date, pillar, hook, description). Banned topics (never mention): {banned}.
+Apply the requested change with the same level of specificity and production-readiness as the
+rest of the plan - if the request itself is vague, use your judgment to make it concrete rather
+than writing something equally vague back. Leave every other day exactly as it was unless the
+change logically requires touching them too. Keep the same dates, the same number of entries, and
+this exact JSON shape per item:
+{shape}
+Banned topics (never mention): {banned}.
 
 Return ONLY the full revised JSON array, no prose, no markdown fences."""
     text = generate_text(prompt)
@@ -125,7 +175,6 @@ def _build_prompt(
     recent_hooks: list[str],
     content_type: str,
     brief: str,
-    outline_map: dict[str, dict] | None = None,
 ) -> str:
     pillars = ", ".join(brand.content_pillars) or "general"
     banned = ", ".join(brand.banned_topics) or "none"
@@ -135,48 +184,7 @@ def _build_prompt(
         if brief.strip()
         else ""
     )
-
-    plan_line = ""
-    if outline_map:
-        plan_items = [outline_map[d.isoformat()] for d in dates if d.isoformat() in outline_map]
-        if plan_items:
-            plan_rows = "\n".join(
-                f'- {item["scheduled_date"]}: pillar="{item.get("pillar", "")}", hook="{item.get("hook", "")}", '
-                f'direction="{item.get("description", "")}"'
-                for item in plan_items
-            )
-            plan_line = (
-                "\nThe creator already reviewed and approved a specific plan for each date below - write the "
-                "FULL post so it matches that plan exactly (same hook, same pillar, covering exactly what the "
-                "direction describes). Do not invent a different topic for these dates:\n" + plan_rows + "\n"
-            )
-
-    if content_type == "post":
-        format_desc = "static Instagram feed posts (a single stock photo + caption, no video)"
-        shape = """{
-    "scheduled_date": "YYYY-MM-DD",
-    "pillar": "which content pillar this belongs to",
-    "hook": "the first line of the caption - must stop the scroll and earn the read, no generic throat-clearing",
-    "video_concept": "1-2 sentence description of the moment/scene the photo should capture",
-    "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
-    "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
-    "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
-    "broll_keywords": "3-5 comma-separated stock-photo search terms (concrete, visual, searchable on a stock photo site) that match this post, most important first"
-  }"""
-    else:
-        format_desc = "Instagram Reels (short vertical video)"
-        shape = """{
-    "scheduled_date": "YYYY-MM-DD",
-    "pillar": "which content pillar this belongs to",
-    "hook": "the opening line/hook, first 1-2 seconds of the video - must stop the scroll, earn the next second of attention, no generic throat-clearing",
-    "video_concept": "1-2 sentence description of what the video shows/does",
-    "script": "full voiceover script, natural spoken language, 30-60 seconds when read aloud, conversational not corporate",
-    "on_screen_text": "short on-screen caption/text overlay for the video, or empty string if none",
-    "caption": "scroll-stopping Instagram caption optimized to perform well: strong opening line, matches the brand tone, ends with the call-to-action - not generic or corporate",
-    "hashtags": "space-separated hashtags relevant to THIS post's actual topic, patterned after the hashtag style guidance (count/mix) - never reuse example tags from that guidance verbatim if they don't fit this specific topic",
-    "title": "a short, natural, human-readable title for this post (normal spacing and capitalization, like a headline - NEVER underscores or a filename-style slug), shown in the dashboard to identify this post at a glance",
-    "broll_keywords": "3-5 comma-separated stock-footage search terms (concrete, visual, searchable on a stock video site) that match this script's content, in the order they should appear"
-  }"""
+    format_desc, shape = _post_shape(content_type)
 
     return f"""You are a social media strategist planning {format_desc} for this brand. Every field
 must be genuinely optimized for real social media performance, not just technically correct -
@@ -190,7 +198,7 @@ Content pillars to rotate through: {pillars}
 Banned topics (never mention): {banned}
 Call-to-action style: {brand.cta_style or "encourage engagement"}
 Hashtag style: {brand.hashtag_style or "8-12 relevant hashtags, mix of broad and niche"}
-{brief_line}{plan_line}
+{brief_line}
 Hooks already used recently (do not repeat these or anything too similar):
 {recent}
 
@@ -202,6 +210,25 @@ Return ONLY a JSON array (no prose, no markdown fences), one object per date, in
 ]
 
 Ensure variety across pillars and hooks, and that every item strictly avoids the banned topics."""
+
+
+def _post_from_item(user_id: int, media_type: str, default_platforms: list[str], item: dict) -> Post:
+    return Post(
+        user_id=user_id,
+        scheduled_at=dt.datetime.combine(dt.date.fromisoformat(item["scheduled_date"]), DEFAULT_POST_TIME),
+        media_type=media_type,
+        target_platforms=list(default_platforms),
+        pillar=item.get("pillar", ""),
+        hook=item.get("hook", ""),
+        video_concept=item.get("video_concept", ""),
+        script=item.get("script", ""),
+        on_screen_text=item.get("on_screen_text", ""),
+        caption=item.get("caption", ""),
+        hashtags=item.get("hashtags", ""),
+        title=item.get("title", ""),
+        broll_keywords=item.get("broll_keywords", ""),
+        status=PostStatus.PLANNED.value,
+    )
 
 
 def generate_calendar(
@@ -217,11 +244,16 @@ def generate_calendar(
     """Generate a content calendar for the given window and persist new Post
     rows for this user. Idempotent: dates that already have a Post row for
     this user are skipped. content_type is "video" (Reels, via the broll/TTS
-    pipeline) or "post" (a single stock photo per date). If `outline` is
-    given (from generate_plan_outline/revise_plan_outline, keyed by
-    scheduled_date), each date's full post is written to match that
-    already-reviewed plan instead of being improvised fresh from `brief`."""
-    outline_map = {item["scheduled_date"]: item for item in outline} if outline else None
+    pipeline) or "post" (a single stock photo per date).
+
+    If `outline` is given (from generate_plan_outline/revise_plan_outline,
+    already-reviewed full posts keyed by scheduled_date), those dates are
+    persisted directly with no further LLM call - what the creator approved
+    is exactly what gets saved, not a fresh rewrite that could disagree with
+    it. Any pending date NOT covered by the outline still goes through the
+    normal batch generation from `brief` (e.g. the outline only covered part
+    of the requested window, or generate_calendar was called without one)."""
+    outline_map = {item["scheduled_date"]: item for item in outline} if outline else {}
     all_dates = compute_schedule_dates(start_date, num_days, brand.posting_cadence_per_week)
 
     existing_dates = set(
@@ -250,33 +282,28 @@ def generate_calendar(
         ).all()
     )
 
-    for i in range(0, len(pending_dates), BATCH_SIZE):
-        batch_dates = pending_dates[i : i + BATCH_SIZE]
+    direct_dates = [d for d in pending_dates if d.isoformat() in outline_map]
+    remaining_dates = [d for d in pending_dates if d.isoformat() not in outline_map]
+
+    for d in direct_dates:
+        post = _post_from_item(user_id, media_type, default_platforms, outline_map[d.isoformat()])
+        session.add(post)
+        created.append(post)
+        recent_hooks.append(post.hook)
+    if direct_dates:
+        session.commit()
+        logger.info("Persisted %d already-approved post(s) from the reviewed plan.", len(direct_dates))
+
+    for i in range(0, len(remaining_dates), BATCH_SIZE):
+        batch_dates = remaining_dates[i : i + BATCH_SIZE]
         logger.info("Generating calendar batch for %s dates starting %s", len(batch_dates), batch_dates[0])
 
-        prompt = _build_prompt(brand, batch_dates, recent_hooks, content_type, brief, outline_map)
+        prompt = _build_prompt(brand, batch_dates, recent_hooks, content_type, brief)
         text = generate_text(prompt)
         items = extract_json_array(text)
 
         for item in items:
-            post = Post(
-                user_id=user_id,
-                scheduled_at=dt.datetime.combine(
-                    dt.date.fromisoformat(item["scheduled_date"]), DEFAULT_POST_TIME
-                ),
-                media_type=media_type,
-                target_platforms=list(default_platforms),
-                pillar=item.get("pillar", ""),
-                hook=item.get("hook", ""),
-                video_concept=item.get("video_concept", ""),
-                script=item.get("script", ""),
-                on_screen_text=item.get("on_screen_text", ""),
-                caption=item.get("caption", ""),
-                hashtags=item.get("hashtags", ""),
-                title=item.get("title", ""),
-                broll_keywords=item.get("broll_keywords", ""),
-                status=PostStatus.PLANNED.value,
-            )
+            post = _post_from_item(user_id, media_type, default_platforms, item)
             session.add(post)
             created.append(post)
             recent_hooks.append(post.hook)

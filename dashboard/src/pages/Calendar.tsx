@@ -426,7 +426,13 @@ interface PlanItem {
   scheduled_date: string
   pillar: string
   hook: string
-  description: string
+  video_concept: string
+  script?: string
+  on_screen_text?: string
+  caption: string
+  hashtags: string
+  title: string
+  broll_keywords?: string
 }
 
 function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted: () => void }) {
@@ -438,6 +444,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
   const [outline, setOutline] = useState<PlanItem[]>([])
   const [resolvedBrief, setResolvedBrief] = useState("")
   const [amendment, setAmendment] = useState("")
+  const [expandedDay, setExpandedDay] = useState<number | null>(null)
   const [amending, setAmending] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -451,6 +458,7 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
     setOutline([])
     setResolvedBrief("")
     setAmendment("")
+    setExpandedDay(null)
     setError(null)
   }
 
@@ -655,28 +663,68 @@ function GenerateModal({ open, onClose, onStarted }: { open: boolean; onClose: (
                   matching your posting frequency. Don't like something? Say so below and we'll adjust it.
                 </p>
 
-                <div className="mt-4 max-h-[22rem] space-y-2 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
-                  {outline.map((item, i) => (
-                    <div key={item.scheduled_date + i} className="rounded-md border border-[var(--color-border)] bg-black/[0.02] p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-[var(--color-primary)]">
-                          Day {i + 1} ·{" "}
-                          {new Date(item.scheduled_date).toLocaleDateString(undefined, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                        {item.pillar && (
-                          <span className="shrink-0 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
-                            {item.pillar}
+                <div className="mt-4 max-h-[26rem] space-y-2 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
+                  {outline.map((item, i) => {
+                    const isOpen = expandedDay === i
+                    return (
+                      <div key={item.scheduled_date + i} className="rounded-md border border-[var(--color-border)] bg-black/[0.02] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-[var(--color-primary)]">
+                            Day {i + 1} ·{" "}
+                            {new Date(item.scheduled_date).toLocaleDateString(undefined, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
                           </span>
+                          {item.pillar && (
+                            <span className="shrink-0 rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--color-text-muted)]">
+                              {item.pillar}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 text-sm font-semibold">{item.title || item.hook}</div>
+                        <div className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          <span className="font-semibold text-[var(--color-text-faint)]">Hook: </span>
+                          {item.hook}
+                        </div>
+                        <div className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          <span className="font-semibold text-[var(--color-text-faint)]">Video: </span>
+                          {item.video_concept}
+                        </div>
+
+                        {isOpen && (
+                          <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                            {item.script && (
+                              <div className="text-xs text-[var(--color-text-muted)]">
+                                <span className="font-semibold text-[var(--color-text-faint)]">Script: </span>
+                                {item.script}
+                              </div>
+                            )}
+                            {item.on_screen_text && (
+                              <div className="text-xs text-[var(--color-text-muted)]">
+                                <span className="font-semibold text-[var(--color-text-faint)]">On-screen text: </span>
+                                {item.on_screen_text}
+                              </div>
+                            )}
+                            <div className="text-xs text-[var(--color-text-muted)]">
+                              <span className="font-semibold text-[var(--color-text-faint)]">Caption: </span>
+                              {item.caption}
+                            </div>
+                            <div className="text-xs text-[var(--color-primary)]">{item.hashtags}</div>
+                          </div>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDay(isOpen ? null : i)}
+                          className="mt-1.5 text-[11px] font-semibold text-[var(--color-primary)] hover:underline"
+                        >
+                          {isOpen ? "Hide full content" : "Show full content"}
+                        </button>
                       </div>
-                      <div className="mt-1 text-sm font-semibold">{item.hook}</div>
-                      <div className="mt-0.5 text-xs text-[var(--color-text-muted)]">{item.description}</div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 <div className="mt-4">
