@@ -3,30 +3,70 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse, HTMLResponse, PlainTextResponse
 
 from api import (
+    legal,
     routes_ai,
+    routes_analytics,
     routes_brand,
+    routes_competitors,
     routes_create,
+    routes_engagement,
+    routes_events,
     routes_facebook,
     routes_instagram,
     routes_linkedin,
+    routes_messages,
     routes_orchestrator,
     routes_posts,
     routes_tiktok,
     routes_uploads,
+    routes_workspaces,
     routes_x,
+    routes_youtube,
 )
 from api.auth import router as auth_router
 from db.session import init_db
 
 app = FastAPI(title="Instagram Automation")
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 init_db()
 
+
+def _resume_interrupted_work() -> None:
+    """A restart kills background tasks mid-way. Finish any post images that
+    were in progress, and close runs that will never report back."""
+    import datetime as dt
+    import threading
+
+    from db.models import Post, PostStatus, RunLog
+    from db.session import get_session
+    from orchestrator.daily import design_posts
+
+    session = get_session()
+    try:
+        for run in session.query(RunLog).filter(RunLog.status == "running").all():
+            run.status = "error"
+            run.error = "Interrupted by a server restart"
+            run.finished_at = dt.datetime.utcnow()
+        stuck: dict[int, list[int]] = {}
+        for post in session.query(Post).filter(Post.status == PostStatus.IMAGE_GENERATING.value).all():
+            stuck.setdefault(post.workspace_id, []).append(post.id)
+        session.commit()
+    finally:
+        session.close()
+    for workspace_id, post_ids in stuck.items():
+        threading.Thread(target=design_posts, args=(workspace_id, post_ids), daemon=True).start()
+
+
+_resume_interrupted_work()
+
 app.include_router(auth_router)
+app.include_router(routes_workspaces.router)
 app.include_router(routes_brand.router)
 app.include_router(routes_posts.router)
 app.include_router(routes_orchestrator.router)
@@ -35,79 +75,24 @@ app.include_router(routes_facebook.router)
 app.include_router(routes_linkedin.router)
 app.include_router(routes_tiktok.router)
 app.include_router(routes_x.router)
+app.include_router(routes_youtube.router)
+app.include_router(routes_analytics.router)
+app.include_router(routes_engagement.router)
+app.include_router(routes_messages.router)
+app.include_router(routes_competitors.router)
+app.include_router(routes_events.router)
 app.include_router(routes_ai.router)
 app.include_router(routes_uploads.router)
 app.include_router(routes_create.router)
 
-_LEGAL_PAGE_STYLE = """<style>
-body{font-family:-apple-system,system-ui,sans-serif;max-width:720px;margin:0 auto;padding:40px 20px;
-line-height:1.6;color:#1a1a1a}h1{font-size:1.6rem}h2{font-size:1.15rem;margin-top:2em}
-p,li{color:#333}small{color:#777}</style>"""
-
-_TERMS_HTML = f"""<!doctype html><html><head><title>Terms of Service - Reelmind</title>{_LEGAL_PAGE_STYLE}</head>
-<body>
-<h1>Terms of Service</h1>
-<p><small>Last updated: 2026</small></p>
-<p>Reelmind is a content scheduling and AI-assisted content creation tool. By connecting a social
-media account (Instagram, Facebook, LinkedIn, TikTok, or X) to Reelmind, you authorize it to publish
-posts to that account on your behalf, at times and with content that you review and approve inside
-the app.</p>
-<h2>What Reelmind does</h2>
-<ul>
-<li>Stores the brand/profile information you provide to plan and write content.</li>
-<li>Generates draft captions, scripts, and video/image content using third-party AI and stock-media
-providers, which you can edit before anything is published.</li>
-<li>Publishes approved posts to the social accounts you've explicitly connected, at the times you
-schedule.</li>
-</ul>
-<h2>Your responsibilities</h2>
-<p>You are responsible for the content you approve for publishing and for complying with each
-connected platform's own terms of service and community guidelines.</p>
-<h2>No warranty</h2>
-<p>Reelmind is provided as-is, without warranty of any kind. It is currently an individual/early-stage
-project, not a registered company.</p>
-<h2>Contact</h2>
-<p>Questions about these terms can be directed to the account owner via the platform where you were
-given access to this tool.</p>
-</body></html>"""
-
-_PRIVACY_HTML = f"""<!doctype html><html><head><title>Privacy Policy - Reelmind</title>{_LEGAL_PAGE_STYLE}</head>
-<body>
-<h1>Privacy Policy</h1>
-<p><small>Last updated: 2026</small></p>
-<h2>What we collect</h2>
-<ul>
-<li><strong>Account info:</strong> the email and password you sign up with (password is stored
-hashed, never in plain text).</li>
-<li><strong>Brand/content info:</strong> whatever you enter to describe your brand, and any
-files/media you upload or that get generated for you.</li>
-<li><strong>Connected-platform tokens:</strong> when you connect Instagram, Facebook, LinkedIn,
-TikTok, or X, we store the access token that platform issues so Reelmind can publish on your behalf. We
-never see or store your password for those platforms - authentication happens entirely on each
-platform's own login page.</li>
-</ul>
-<h2>How we use it</h2>
-<p>Solely to operate the product: generating your content calendar, producing draft posts, and
-publishing the posts you approve to the platforms you've connected, at your scheduled times.</p>
-<h2>What we don't do</h2>
-<p>We don't sell your data, and we don't use your connected accounts for anything other than the
-publishing actions you initiate or schedule yourself.</p>
-<h2>Data retention</h2>
-<p>Your data is retained for as long as your account exists. You can request deletion at any time.</p>
-<h2>Contact</h2>
-<p>Questions about this policy can be directed to the account owner via the platform where you were
-given access to this tool.</p>
-</body></html>"""
-
-
 @app.get("/terms", response_class=HTMLResponse, include_in_schema=False)
 def terms_of_service() -> str:
-    return _TERMS_HTML
+    return legal.terms_html()
 
 
 @app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
 def privacy_policy() -> str:
-    return _PRIVACY_HTML
+    return legal.privacy_html()
 
 
 # TikTok domain-ownership verification files - proves we control this app's
@@ -122,10 +107,22 @@ def tiktok_domain_verification() -> str:
 DIST_DIR = Path(__file__).resolve().parent.parent / "dashboard" / "dist"
 
 if DIST_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+    class _ImmutableAssets(StaticFiles):
+        # Vite puts a content hash in every asset filename, so a given URL's
+        # bytes never change - browsers can keep them for a year and skip the
+        # download entirely on repeat visits.
+        async def get_response(self, path, scope):
+            response = await super().get_response(path, scope)
+            if response.status_code == 200:
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return response
+
+    app.mount("/assets", _ImmutableAssets(directory=DIST_DIR / "assets"), name="assets")
 
     @app.get("/{full_path:path}")
     def spa(full_path: str):
         # Serve the built dashboard for any non-API route, so client-side
         # routing (React Router) works on a hard refresh / direct link.
-        return FileResponse(DIST_DIR / "index.html")
+        # index.html must always be revalidated - it's what points at the
+        # newest hashed asset filenames after each deploy.
+        return FileResponse(DIST_DIR / "index.html", headers={"Cache-Control": "no-cache"})

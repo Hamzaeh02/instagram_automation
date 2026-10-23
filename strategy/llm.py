@@ -8,14 +8,14 @@ from common.logging import get_logger
 
 logger = get_logger(__name__)
 
-# A batch of BATCH_SIZE=10 Reels, each needing a full 30-60s voiceover
-# script plus hook/caption/hashtags/etc, comfortably exceeds 4096 tokens -
-# that limit was causing the model's JSON response to get cut off mid-field,
-# which _extract_json_array/_extract_json_object then correctly rejected as
-# malformed (rather than silently accepting truncated content), failing the
-# whole batch. Every brand-new signup hit this on their very first calendar
-# generation. Raised with headroom for the largest realistic batch.
-MAX_TOKENS = 8192
+# Streaming, so a big batch of fully-written posts never hits an HTTP
+# timeout or gets cut off mid-JSON.
+MAX_TOKENS = 64000
+
+
+
+class LLMError(RuntimeError):
+    pass
 
 
 def extract_json_object(text: str) -> dict:
@@ -32,35 +32,42 @@ def extract_json_array(text: str) -> list[dict]:
     return json.loads(match.group(0))
 
 
-def _call_anthropic(prompt: str) -> str:
+def _client():
     from anthropic import Anthropic
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
-    response = client.messages.create(
-        model=settings.anthropic_model,
+    if not settings.anthropic_api_key:
+        raise LLMError("ANTHROPIC_API_KEY isn't set - add your Anthropic API key to .env and restart the server")
+    return Anthropic(api_key=settings.anthropic_api_key)
+
+
+def generate_text(prompt: str, *, effort: str = "medium", system: str | None = None) -> str:
+    """One Claude call. No web search - content comes from the brand profile
+    and Claude's own knowledge, which keeps every call cheap."""
+    client = _client()
+    model = settings.anthropic_model
+    params = dict(
+        model=model,
         max_tokens=MAX_TOKENS,
+        thinking={"type": "adaptive"},
+        output_config={"effort": effort},
         messages=[{"role": "user", "content": prompt}],
+        **({"system": system} if system else {}),
     )
-    return "".join(block.text for block in response.content if block.type == "text")
+    if "haiku" in model:
+        stream_ctx = client.messages.stream(**params)
+    else:
+        # If a safety classifier declines, the API retries on a fallback
+        # model inside the same call instead of returning nothing (not
+        # offered for Haiku).
+        stream_ctx = client.beta.messages.stream(
+            betas=["server-side-fallback-2026-07-01"], fallbacks="default", **params
+        )
+    with stream_ctx as stream:
+        response = stream.get_final_message()
 
-
-def _call_groq(prompt: str) -> str:
-    from groq import Groq
-
-    client = Groq(api_key=settings.groq_api_key)
-    response = client.chat.completions.create(
-        model=settings.groq_model,
-        max_tokens=MAX_TOKENS,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.choices[0].message.content or ""
-
-
-def generate_text(prompt: str) -> str:
-    """Dispatches to whichever LLM provider is active (LLM_PROVIDER=anthropic|groq)."""
-    provider = settings.llm_provider
-    if provider == "anthropic":
-        return _call_anthropic(prompt)
-    if provider == "groq":
-        return _call_groq(prompt)
-    raise ValueError(f"Unknown LLM_PROVIDER '{provider}' (expected 'anthropic' or 'groq')")
+    if response.stop_reason == "refusal":
+        raise LLMError("Claude declined to write this content - try rephrasing the brief")
+    if response.stop_reason == "max_tokens":
+        raise LLMError("The response was too long and got cut off - try fewer days or a narrower brief")
+    logger.info("Claude call done (in=%s out=%s tokens)", response.usage.input_tokens, response.usage.output_tokens)
+    return "".join(b.text for b in response.content if b.type == "text")

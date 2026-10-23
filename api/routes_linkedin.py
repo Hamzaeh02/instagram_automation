@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from starlette.responses import RedirectResponse
 
-from api.auth import require_auth
+from api.auth import require_auth, require_workspace
 from common.config import settings
 from common.logging import get_logger
 from common.timeutil import utc_iso
-from db.models import LinkedInConnection, User
+from db.models import LinkedInConnection, User, Workspace
 from db.session import get_session
 
 logger = get_logger(__name__)
@@ -35,10 +35,10 @@ def _state_serializer() -> URLSafeTimedSerializer:
 
 
 @router.get("/status")
-def status(user: User = Depends(require_auth)):
+def status(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(LinkedInConnection).filter(LinkedInConnection.user_id == user.id).first()
+        conn = session.query(LinkedInConnection).filter(LinkedInConnection.workspace_id == workspace.id).first()
         if not conn or not conn.access_token:
             return {"connected": False}
         return {"connected": True, "person_name": conn.person_name, "connected_at": utc_iso(conn.connected_at)}
@@ -47,13 +47,13 @@ def status(user: User = Depends(require_auth)):
 
 
 @router.get("/connect")
-def connect(user: User = Depends(require_auth)):
+def connect(user: User = Depends(require_auth), workspace: Workspace = Depends(require_workspace)):
     if not (settings.linkedin_client_id and settings.linkedin_oauth_redirect_uri):
         raise HTTPException(
             status_code=500,
             detail="LinkedIn connect isn't configured on the server (LINKEDIN_CLIENT_ID / LINKEDIN_OAUTH_REDIRECT_URI)",
         )
-    state = _state_serializer().dumps({"user_id": user.id})
+    state = _state_serializer().dumps({"user_id": user.id, "workspace_id": workspace.id})
     params = {
         "response_type": "code",
         "client_id": settings.linkedin_client_id,
@@ -77,6 +77,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
     try:
         data = _state_serializer().loads(state, max_age=STATE_MAX_AGE_SECONDS)
         user_id = data["user_id"]
+        workspace_id = data["workspace_id"]
     except (BadSignature, KeyError) as exc:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state") from exc
 
@@ -105,16 +106,17 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
     session = get_session()
     try:
-        conn = session.query(LinkedInConnection).filter(LinkedInConnection.user_id == user_id).first()
+        conn = session.query(LinkedInConnection).filter(LinkedInConnection.workspace_id == workspace_id).first()
         if not conn:
-            conn = LinkedInConnection(user_id=user_id)
+            conn = LinkedInConnection(user_id=user_id, workspace_id=workspace_id)
             session.add(conn)
+        conn.connected_at = dt.datetime.utcnow()
         conn.access_token = access_token
         conn.token_expires_at = dt.datetime.utcnow() + dt.timedelta(seconds=expires_in)
         conn.person_id = person_id
         conn.person_name = person_name
         session.commit()
-        logger.info("LinkedIn connected for user %s: %s", user_id, person_name)
+        logger.info("LinkedIn connected for workspace %s: %s", workspace_id, person_name)
     finally:
         session.close()
 
@@ -122,10 +124,10 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
 
 @router.delete("/connection")
-def disconnect(user: User = Depends(require_auth)):
+def disconnect(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(LinkedInConnection).filter(LinkedInConnection.user_id == user.id).first()
+        conn = session.query(LinkedInConnection).filter(LinkedInConnection.workspace_id == workspace.id).first()
         if conn:
             session.delete(conn)
             session.commit()

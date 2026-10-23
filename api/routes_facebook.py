@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import datetime as dt
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from pydantic import BaseModel
 from starlette.responses import RedirectResponse
 
-from api.auth import require_auth
+from api.auth import require_auth, require_workspace
 from common.config import settings
 from common.logging import get_logger
 from common.timeutil import utc_iso
-from db.models import FacebookConnection, User
+from db.models import FacebookConnection, User, Workspace
 from db.session import get_session
 
 logger = get_logger(__name__)
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/api/facebook", tags=["facebook"])
 
 AUTHORIZE_URL = f"https://www.facebook.com/{settings.facebook_graph_api_version}/dialog/oauth"
 GRAPH_BASE = f"https://graph.facebook.com/{settings.facebook_graph_api_version}"
-SCOPES = "pages_show_list,pages_manage_posts,pages_manage_metadata,pages_read_engagement"
+SCOPES = "pages_show_list,pages_manage_posts,pages_manage_metadata,pages_read_engagement,pages_read_user_content,read_insights,pages_manage_engagement,pages_messaging,instagram_basic,instagram_manage_insights"
 STATE_MAX_AGE_SECONDS = 600
 
 
@@ -28,10 +30,10 @@ def _state_serializer() -> URLSafeTimedSerializer:
 
 
 @router.get("/status")
-def status(user: User = Depends(require_auth)):
+def status(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(FacebookConnection).filter(FacebookConnection.user_id == user.id).first()
+        conn = session.query(FacebookConnection).filter(FacebookConnection.workspace_id == workspace.id).first()
         if not conn or not conn.user_access_token:
             return {"connected": False}
         if not conn.page_id:
@@ -42,13 +44,13 @@ def status(user: User = Depends(require_auth)):
 
 
 @router.get("/connect")
-def connect(user: User = Depends(require_auth)):
+def connect(user: User = Depends(require_auth), workspace: Workspace = Depends(require_workspace)):
     if not (settings.meta_app_id and settings.facebook_oauth_redirect_uri):
         raise HTTPException(
             status_code=500,
             detail="Facebook connect isn't configured on the server (META_APP_ID / FACEBOOK_OAUTH_REDIRECT_URI)",
         )
-    state = _state_serializer().dumps({"user_id": user.id})
+    state = _state_serializer().dumps({"user_id": user.id, "workspace_id": workspace.id})
     params = {
         "client_id": settings.meta_app_id,
         "redirect_uri": settings.facebook_oauth_redirect_uri,
@@ -72,6 +74,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
     try:
         data = _state_serializer().loads(state, max_age=STATE_MAX_AGE_SECONDS)
         user_id = data["user_id"]
+        workspace_id = data["workspace_id"]
     except (BadSignature, KeyError) as exc:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state") from exc
 
@@ -105,15 +108,16 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
         pages = pages_resp.json().get("data", [])
 
     if not pages:
-        logger.warning("Facebook connect for user %s found no manageable Pages", user_id)
+        logger.warning("Facebook connect for workspace %s found no manageable Pages", workspace_id)
         return RedirectResponse("/settings?facebook=no_pages")
 
     session = get_session()
     try:
-        conn = session.query(FacebookConnection).filter(FacebookConnection.user_id == user_id).first()
+        conn = session.query(FacebookConnection).filter(FacebookConnection.workspace_id == workspace_id).first()
         if not conn:
-            conn = FacebookConnection(user_id=user_id)
+            conn = FacebookConnection(user_id=user_id, workspace_id=workspace_id)
             session.add(conn)
+        conn.connected_at = dt.datetime.utcnow()
         conn.user_access_token = long_token
         if len(pages) == 1:
             conn.page_id = pages[0]["id"]
@@ -126,7 +130,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
             conn.page_name = ""
             conn.page_access_token = ""
         session.commit()
-        logger.info("Facebook connected for user %s (%d page(s) available)", user_id, len(pages))
+        logger.info("Facebook connected for workspace %s (%d page(s) available)", workspace_id, len(pages))
     finally:
         session.close()
 
@@ -136,10 +140,10 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
 
 @router.get("/pages")
-def list_pages(user: User = Depends(require_auth)):
+def list_pages(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(FacebookConnection).filter(FacebookConnection.user_id == user.id).first()
+        conn = session.query(FacebookConnection).filter(FacebookConnection.workspace_id == workspace.id).first()
         if not conn or not conn.user_access_token:
             raise HTTPException(status_code=400, detail="Connect Facebook first")
         token = conn.user_access_token
@@ -159,10 +163,10 @@ class SelectPageRequest(BaseModel):
 
 
 @router.post("/page")
-def select_page(body: SelectPageRequest, user: User = Depends(require_auth)):
+def select_page(body: SelectPageRequest, workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(FacebookConnection).filter(FacebookConnection.user_id == user.id).first()
+        conn = session.query(FacebookConnection).filter(FacebookConnection.workspace_id == workspace.id).first()
         if not conn or not conn.user_access_token:
             raise HTTPException(status_code=400, detail="Connect Facebook first")
         token = conn.user_access_token
@@ -180,22 +184,22 @@ def select_page(body: SelectPageRequest, user: User = Depends(require_auth)):
 
     session = get_session()
     try:
-        conn = session.query(FacebookConnection).filter(FacebookConnection.user_id == user.id).first()
+        conn = session.query(FacebookConnection).filter(FacebookConnection.workspace_id == workspace.id).first()
         conn.page_id = page["id"]
         conn.page_name = page["name"]
         conn.page_access_token = page["access_token"]
         session.commit()
-        logger.info("Facebook Page selected for user %s: %s", user.id, page["name"])
+        logger.info("Facebook Page selected for workspace %s: %s", workspace.id, page["name"])
         return {"connected": True, "page_name": conn.page_name}
     finally:
         session.close()
 
 
 @router.delete("/connection")
-def disconnect(user: User = Depends(require_auth)):
+def disconnect(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(FacebookConnection).filter(FacebookConnection.user_id == user.id).first()
+        conn = session.query(FacebookConnection).filter(FacebookConnection.workspace_id == workspace.id).first()
         if conn:
             session.delete(conn)
             session.commit()

@@ -43,6 +43,22 @@ FIELD_INSTRUCTIONS: dict[str, str] = {
         "of a couple of broad high-volume tags, several specific niche tags, and 1-2 branded tags - "
         "roughly 8-15 total, space-separated."
     ),
+    "youtube_title": (
+        "Rewrite this into a YouTube video title optimized for search and click-through: lead with "
+        "the main keyword, make the viewer curious or promise a clear payoff, under 70 characters. "
+        "No clickbait that the video doesn't deliver, no ALL CAPS, and never use < or > characters."
+    ),
+    "youtube_description": (
+        "Rewrite this into a YouTube video description optimized for search: the first two lines "
+        "summarize the video with the main keywords (they show in search results), then a short "
+        "paragraph of detail, a call-to-action to like and subscribe, and finally 3-5 relevant "
+        "#hashtags on the last line (YouTube shows the first three above the title). Never use < or > characters."
+    ),
+    "youtube_tags": (
+        "Rewrite/expand this into YouTube tags optimized for search: 10-15 comma-separated keyword "
+        "phrases mixing the exact topic, broader category terms, and common misspellings/variants. "
+        "No # symbols, under 450 characters total."
+    ),
 }
 
 
@@ -75,7 +91,7 @@ Current text: "{body.text}"
 Return ONLY the improved text - no quotes, no explanation, no markdown, no preamble."""
 
     try:
-        improved = generate_text(prompt).strip().strip('"').strip()
+        improved = generate_text(prompt, effort="low").strip().strip('"').strip()
     except Exception as exc:
         logger.exception("AI improve failed for field %s", body.field)
         raise HTTPException(status_code=502, detail=f"AI improve failed: {exc}") from exc

@@ -1,12 +1,15 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowLeft, Briefcase, Camera, Check, ExternalLink, Globe, Music2, Save, Sparkles, Trash2, X } from "lucide-react"
-import { useEffect, useState, type ComponentType } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { ArrowLeft, Check, ExternalLink, FlaskConical, Save, Sparkles, Trash2, Upload, Video, X } from "lucide-react"
+import { useEffect, useRef, useState, type ComponentType } from "react"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api, ApiError } from "../api/client"
 import { Button, Card, FadeIn, Label, Spinner, Textarea, Input } from "../components/ui"
 import { StatusBadge } from "../components/StatusBadge"
-import { XLogo } from "../components/XLogo"
-import type { Platform, Post } from "../lib/types"
+import { FacebookBrand, InstagramBrand, LinkedInBrand, TikTokBrand, XBrand, YouTubeBrand } from "../components/BrandLogos"
+import { YouTubeDetailsForm } from "../components/YouTubeDetailsForm"
+import { PostInsightsPanel } from "../components/PostInsightsPanel"
+import { PostScoreCard, ScoreBadge } from "../components/PostScore"
+import type { Platform, Post, YouTubeOptions } from "../lib/types"
 
 function toDatetimeLocal(iso: string) {
   const d = new Date(iso)
@@ -15,20 +18,25 @@ function toDatetimeLocal(iso: string) {
 }
 
 const PLATFORM_META: Record<Platform, { label: string; icon: ComponentType<{ className?: string }> }> = {
-  instagram: { label: "Instagram", icon: Camera },
-  facebook: { label: "Facebook", icon: Globe },
-  linkedin: { label: "LinkedIn", icon: Briefcase },
-  tiktok: { label: "TikTok", icon: Music2 },
-  x: { label: "X", icon: XLogo },
+  instagram: { label: "Instagram", icon: InstagramBrand },
+  facebook: { label: "Facebook", icon: FacebookBrand },
+  linkedin: { label: "LinkedIn", icon: LinkedInBrand },
+  tiktok: { label: "TikTok", icon: TikTokBrand },
+  x: { label: "X", icon: XBrand },
+  youtube: { label: "YouTube", icon: YouTubeBrand },
 }
-const ALL_PLATFORMS: Platform[] = ["instagram", "facebook", "linkedin", "tiktok", "x"]
-const TABS = ["Content", "Publishing"] as const
+const ALL_PLATFORMS: Platform[] = ["instagram", "facebook", "linkedin", "tiktok", "x", "youtube"]
+const TABS = ["Content", "Publishing", "Insights"] as const
 
 export function PostDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [post, setPost] = useState<Post | null>(null)
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Content")
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState<(typeof TABS)[number]>(() => {
+    const requested = searchParams.get("tab")
+    return (TABS as readonly string[]).includes(requested ?? "") ? (requested as (typeof TABS)[number]) : "Content"
+  })
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showReject, setShowReject] = useState(false)
@@ -37,12 +45,83 @@ export function PostDetail() {
   const [connected, setConnected] = useState<Record<Platform, boolean> | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [showDelete, setShowDelete] = useState(false)
+  const [yt, setYt] = useState<YouTubeOptions>({})
+  const [ytDirty, setYtDirty] = useState(false)
+  const ytDirtyRef = useRef(false)
+  const [ytSaving, setYtSaving] = useState(false)
+  const [ytSaved, setYtSaved] = useState(false)
+  const [ytAssetBusy, setYtAssetBusy] = useState(false)
+  const [thumbVersion, setThumbVersion] = useState(0)
 
   async function load() {
     const res = await api.get<Post>(`/posts/${id}`)
     setPost(res)
     setDirty(false)
+    // Background polling (while a video generates) mustn't wipe unsaved
+    // YouTube edits the user is in the middle of.
+    if (!ytDirtyRef.current) setYt(res.youtube_options ?? {})
     return res
+  }
+
+  function markYtDirty(dirtyNow: boolean) {
+    ytDirtyRef.current = dirtyNow
+    setYtDirty(dirtyNow)
+  }
+
+  async function saveYouTube() {
+    if (!post) return
+    setYtSaving(true)
+    setActionError(null)
+    try {
+      const { has_thumbnail: _h, captions_filename: _c, ...editable } = yt
+      setYt(await api.put<YouTubeOptions>(`/youtube/posts/${post.id}/options`, editable))
+      markYtDirty(false)
+      setYtSaved(true)
+      setTimeout(() => setYtSaved(false), 2500)
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't save YouTube settings")
+    } finally {
+      setYtSaving(false)
+    }
+  }
+
+  const [ytGenerating, setYtGenerating] = useState(false)
+  async function generateThumbnail() {
+    if (!post) return
+    setYtGenerating(true)
+    setActionError(null)
+    try {
+      const view = await api.post<YouTubeOptions>(`/youtube/posts/${post.id}/thumbnail/generate`)
+      setYt((o) => ({ ...o, has_thumbnail: view.has_thumbnail }))
+      setThumbVersion((v) => v + 1)
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't create a thumbnail - try again.")
+    } finally {
+      setYtGenerating(false)
+    }
+  }
+
+  async function setYouTubeAsset(kind: "thumbnail" | "captions", file: File | null) {
+    if (!post) return
+    setYtAssetBusy(true)
+    setActionError(null)
+    try {
+      let view: YouTubeOptions
+      if (file) {
+        const fd = new FormData()
+        fd.append("file", file)
+        if (kind === "captions") fd.append("language", yt.captions_language ?? "en")
+        view = await api.upload<YouTubeOptions>(`/youtube/posts/${post.id}/${kind}`, fd)
+      } else {
+        view = await api.delete<YouTubeOptions>(`/youtube/posts/${post.id}/${kind}`)
+      }
+      setYt((current) => ({ ...current, has_thumbnail: view.has_thumbnail, captions_filename: view.captions_filename }))
+      if (kind === "thumbnail") setThumbVersion((v) => v + 1)
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : `Couldn't update the ${kind}`)
+    } finally {
+      setYtAssetBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -53,13 +132,15 @@ export function PostDetail() {
       api.get<{ connected: boolean }>("/linkedin/status"),
       api.get<{ connected: boolean }>("/tiktok/status"),
       api.get<{ connected: boolean }>("/x/status"),
-    ]).then(([ig, fb, li, tt, x]) => {
+      api.get<{ connected: boolean }>("/youtube/status"),
+    ]).then(([ig, fb, li, tt, x, yt]) => {
       setConnected({
         instagram: ig.connected,
         facebook: fb.connected && !fb.needs_page,
         linkedin: li.connected,
         tiktok: tt.connected,
         x: x.connected,
+        youtube: yt.connected,
       })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,11 +153,18 @@ export function PostDetail() {
   // posts that happen to share the same in-progress status string wouldn't
   // otherwise restart this effect, leaving it polling the previous post.
   useEffect(() => {
-    if (!post || !["planned", "video_generating", "image_generating"].includes(post.status)) return
+    // Only photo posts are filled in by the server; a Reel waits for the
+    // creator's own video, so there's nothing to poll for.
+    if (!post || post.media_type !== "IMAGE" || !["planned", "image_generating"].includes(post.status)) return
     const interval = setInterval(load, 4000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.status, id])
+
+  function onMediaUploaded(updated: Post) {
+    setPost(updated)
+    setDirty(false)
+  }
 
   function update<K extends keyof Post>(key: K, value: Post[K]) {
     setPost((p) => (p ? { ...p, [key]: value } : p))
@@ -103,6 +191,9 @@ export function PostDetail() {
         title: post.title,
         caption: post.caption,
         hashtags: post.hashtags,
+        hook: post.hook,
+        video_concept: post.video_concept,
+        image_prompt: post.image_prompt,
         script: post.script,
         on_screen_text: post.on_screen_text,
         broll_keywords: post.broll_keywords,
@@ -126,6 +217,19 @@ export function PostDetail() {
       setPost(res)
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Couldn't approve this post - try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function redesign() {
+    if (!post) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      setPost(await api.post<Post>(`/posts/${post.id}/redesign`))
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't start the redesign - try again.")
     } finally {
       setBusy(false)
     }
@@ -186,10 +290,11 @@ export function PostDetail() {
           <div className="flex items-center gap-3">
             <h1 className="font-[var(--font-display)] text-xl font-bold">{post.title || "Untitled"}</h1>
             <StatusBadge status={post.status} />
+            {post.score && <ScoreBadge score={post.score.overall} grade={post.score.grade} />}
           </div>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {new Date(post.scheduled_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ·{" "}
-            {post.pillar}
+            {new Date(post.scheduled_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            {post.pillar && ` · ${post.pillar}`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -245,18 +350,32 @@ export function PostDetail() {
           than stretched full-width, which just letterboxed it with huge
           black bars on either side. */}
       <div className="panel-ribbon glass-card mx-auto mb-6 w-fit overflow-hidden p-0">
-        {post.has_video && post.media_type === "IMAGE" ? (
-          <img className="h-96 w-auto max-w-full bg-black object-contain" src={`/api/posts/${post.id}/video`} />
-        ) : post.has_video ? (
-          <video controls className="h-96 w-auto max-w-full bg-black" src={`/api/posts/${post.id}/video`} />
-        ) : post.status === "planned" || post.status === "video_generating" || post.status === "image_generating" ? (
+        {post.media_type === "IMAGE" && (post.status === "planned" || post.status === "image_generating") ? (
           <GeneratingPanel status={post.status} />
+        ) : post.has_video && post.media_type === "IMAGE" ? (
+          <img className="h-96 w-auto max-w-full bg-black object-contain" src={`/api/posts/${post.id}/video?v=${encodeURIComponent(post.updated_at)}`} />
+        ) : post.has_video ? (
+          <video controls className="h-96 w-auto max-w-full bg-black" src={`/api/posts/${post.id}/video?v=${encodeURIComponent(post.updated_at)}`} />
         ) : (
-          <div className="flex h-40 w-72 items-center justify-center text-sm text-[var(--color-text-faint)]">
-            No video for this post
-          </div>
+          <MediaUploadPanel post={post} onUploaded={onMediaUploaded} />
         )}
       </div>
+      {post.has_video && !["posted", "publishing", "image_generating"].includes(post.status) && (
+        <div className="-mt-3 mb-6 flex justify-center gap-2">
+          {post.media_type === "IMAGE" && post.source === "ai_generated" && (
+            <button
+              type="button"
+              onClick={redesign}
+              disabled={busy || dirty}
+              title={dirty ? "Save your changes first" : undefined}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)] hover:bg-black/5 hover:text-[var(--color-text)] disabled:opacity-50"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Redesign
+            </button>
+          )}
+          <ReplaceMediaButton post={post} onUploaded={onMediaUploaded} />
+        </div>
+      )}
 
       <div className="mb-5 flex gap-1 border-b-2 border-[var(--color-border)]">
         {TABS.map((t) => (
@@ -277,6 +396,8 @@ export function PostDetail() {
 
       {tab === "Content" && (
         <div className="max-w-3xl space-y-5">
+          {post.score && <PostScoreCard score={post.score} />}
+          {(post.research_notes || post.sources?.length > 0) && <ResearchCard post={post} />}
           <div>
             <Label>Title</Label>
             <Input value={post.title} onChange={(e) => update("title", e.target.value)} />
@@ -293,11 +414,23 @@ export function PostDetail() {
           {post.source === "ai_generated" && post.media_type === "REELS" && (
             <>
               <div>
-                <Label>Voiceover script</Label>
-                <Textarea rows={5} value={post.script} onChange={(e) => update("script", e.target.value)} />
+                <Label>Hook (first 1–2 seconds)</Label>
+                <Input value={post.hook} onChange={(e) => update("hook", e.target.value)} />
               </div>
               <div>
-                <Label>B-roll keywords</Label>
+                <Label>Script to record</Label>
+                <Textarea rows={6} value={post.script} onChange={(e) => update("script", e.target.value)} />
+              </div>
+              <div>
+                <Label>Shot list</Label>
+                <Textarea rows={6} value={post.video_concept} onChange={(e) => update("video_concept", e.target.value)} />
+              </div>
+              <div>
+                <Label>On-screen text</Label>
+                <Textarea rows={3} value={post.on_screen_text} onChange={(e) => update("on_screen_text", e.target.value)} />
+              </div>
+              <div>
+                <Label>B-roll to capture</Label>
                 <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
               </div>
             </>
@@ -305,9 +438,12 @@ export function PostDetail() {
 
           {post.source === "ai_generated" && post.media_type === "IMAGE" && (
             <div>
-              <Label>Stock photo keywords</Label>
-              <Input value={post.broll_keywords} onChange={(e) => update("broll_keywords", e.target.value)} />
-              <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">What the stock photo was searched for.</p>
+              <Label>Image prompt</Label>
+              <Textarea rows={8} value={post.image_prompt} onChange={(e) => update("image_prompt", e.target.value)} />
+              <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+                The prompt this post's image was made from. Edit it, save, then press Redesign — or clear it
+                and Redesign to have Claude write a fresh one.
+              </p>
             </div>
           )}
         </div>
@@ -347,7 +483,7 @@ export function PostDetail() {
                           : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-black/5")
                     }
                   >
-                    <meta.icon className="h-3.5 w-3.5" />
+                    <meta.icon className="h-4 w-4" />
                     {meta.label}
                     {!isConnected && " (not connected)"}
                   </button>
@@ -386,6 +522,52 @@ export function PostDetail() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "Insights" && <PostInsightsPanel postId={post.id} />}
+
+      {tab === "Publishing" && post.media_type === "REELS" && (
+        <div className="glass-card mt-8 p-6">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-4">
+            <div className="flex items-center gap-2.5">
+              <YouTubeBrand className="h-6 w-8" />
+              <div>
+                <h3 className="font-[var(--font-display)] text-lg font-bold leading-tight">YouTube details</h3>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {post.target_platforms.includes("youtube")
+                    ? "Applied when this video is published to YouTube."
+                    : "Select YouTube under Publish to above for these to be used."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {ytSaved && (
+                <span className="flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
+                  <Check className="h-3.5 w-3.5" /> Saved
+                </span>
+              )}
+              <Button onClick={saveYouTube} disabled={!ytDirty || ytSaving}>
+                <Save className="h-4 w-4" /> {ytSaving ? "Saving…" : "Save YouTube details"}
+              </Button>
+            </div>
+          </div>
+          <YouTubeDetailsForm
+            value={yt}
+            onChange={(patch) => {
+              setYt((o) => ({ ...o, ...patch }))
+              markYtDirty(true)
+            }}
+            fallback={{ title: post.title, caption: post.caption, hashtags: post.hashtags }}
+            videoUrl={post.has_video ? `/api/posts/${post.id}/video` : null}
+            thumbnailUrl={yt.has_thumbnail ? `/api/youtube/posts/${post.id}/thumbnail?v=${thumbVersion}` : null}
+            onThumbnail={(f) => setYouTubeAsset("thumbnail", f)}
+            onGenerateThumbnail={generateThumbnail}
+            generatingThumbnail={ytGenerating}
+            captionsName={yt.captions_filename ?? ""}
+            onCaptions={(f) => setYouTubeAsset("captions", f)}
+            assetBusy={ytAssetBusy}
+          />
         </div>
       )}
 
@@ -468,17 +650,9 @@ export function PostDetail() {
   )
 }
 
-function GeneratingPanel({ status }: { status: "planned" | "video_generating" | "image_generating" }) {
-  const label =
-    status === "video_generating"
-      ? "Generating your video…"
-      : status === "image_generating"
-        ? "Finding a matching photo…"
-        : "Queued — starting shortly…"
-  const detail =
-    status === "image_generating"
-      ? "Searching stock photos for a match — usually just a few seconds."
-      : "Voiceover, footage, and captions are being put together — usually a minute or two."
+function GeneratingPanel({ status }: { status: "planned" | "image_generating" }) {
+  const label = status === "image_generating" ? "Making your image…" : "Queued — starting shortly…"
+  const detail = "Claude is picking a photo and writing the headline — usually 10–20 seconds."
   return (
     <div className="flex h-96 w-72 flex-col items-center justify-center gap-5 p-8 text-center">
       <motion.div
@@ -500,6 +674,127 @@ function GeneratingPanel({ status }: { status: "planned" | "video_generating" | 
         />
       </div>
       <p className="text-[11px] text-[var(--color-text-faint)]">This page updates automatically — no need to refresh.</p>
+    </div>
+  )
+}
+
+function useMediaUpload(post: Post, onUploaded: (p: Post) => void) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const isReel = post.media_type === "REELS"
+  async function upload(file: File) {
+    setUploading(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      onUploaded(await api.upload<Post>(`/uploads/posts/${post.id}/media`, fd))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Upload failed - try again.")
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ""
+    }
+  }
+  const input = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept={isReel ? "video/mp4,video/quicktime,.mp4,.mov" : "image/jpeg,image/png,.jpg,.jpeg,.png"}
+      className="hidden"
+      onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+    />
+  )
+  return { inputRef, uploading, error, isReel, upload, input }
+}
+
+function MediaUploadPanel({ post, onUploaded }: { post: Post; onUploaded: (p: Post) => void }) {
+  const { inputRef, uploading, error, isReel, upload, input } = useMediaUpload(post, onUploaded)
+  const [over, setOver] = useState(false)
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setOver(false)
+        const file = e.dataTransfer.files?.[0]
+        if (file) upload(file)
+      }}
+      className={
+        "flex h-96 w-80 flex-col items-center justify-center gap-4 p-8 text-center transition " +
+        (over ? "bg-[var(--color-primary)]/10" : "")
+      }
+    >
+      {input}
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)]">
+        {isReel ? <Video className="h-5 w-5 text-white" /> : <Upload className="h-5 w-5 text-white" />}
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-[var(--color-text)]">{isReel ? "Film it, then upload your video" : "Upload a photo"}</p>
+        <p className="mt-1 text-xs text-[var(--color-text-faint)]">
+          {isReel
+            ? "Use the script and shot list below. Once your video is attached this Reel moves to review."
+            : "Drop in the photo for this post to send it to review."}
+        </p>
+      </div>
+      <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
+        {uploading ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+        {uploading ? "Uploading…" : isReel ? "Choose video (mp4/mov)" : "Choose photo (jpg/png)"}
+      </Button>
+      <p className="text-[11px] text-[var(--color-text-faint)]">or drag and drop it here</p>
+      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+    </div>
+  )
+}
+
+function ReplaceMediaButton({ post, onUploaded }: { post: Post; onUploaded: (p: Post) => void }) {
+  const { inputRef, uploading, error, isReel, input } = useMediaUpload(post, onUploaded)
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {input}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)] hover:bg-black/5 hover:text-[var(--color-text)]"
+      >
+        {uploading ? <Spinner className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+        {uploading ? "Uploading…" : isReel ? "Replace video" : "Replace photo"}
+      </button>
+      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+    </div>
+  )
+}
+
+function ResearchCard({ post }: { post: Post }) {
+  return (
+    <div className="rounded-xl border border-[var(--color-primary)]/25 bg-[var(--color-primary)]/[0.05] p-4">
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-primary)]">
+        <FlaskConical className="h-3.5 w-3.5" /> Research behind this post
+      </div>
+      {post.research_notes && <p className="text-sm leading-relaxed text-[var(--color-text)]">{post.research_notes}</p>}
+      {post.sources?.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {post.sources.map((url) => (
+            <li key={url}>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex max-w-full items-center gap-1 truncate text-xs text-[var(--color-primary)] hover:underline"
+              >
+                <ExternalLink className="h-3 w-3 shrink-0" />
+                <span className="truncate">{url.replace(/^https?:\/\/(www\.)?/, "")}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

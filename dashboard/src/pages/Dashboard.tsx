@@ -7,6 +7,7 @@ import { Button, FadeIn, PageHeader, Spinner } from "../components/ui"
 import { TiltCard } from "../components/TiltCard"
 import { StatusBadge } from "../components/StatusBadge"
 import { XLogo } from "../components/XLogo"
+import { YouTubeLogo } from "../components/YouTubeLogo"
 import type { BrandProfile, Post, RunLogEntry } from "../lib/types"
 
 interface PlatformStatus {
@@ -24,6 +25,7 @@ export function Dashboard() {
   const [li, setLi] = useState<PlatformStatus | null>(null)
   const [tt, setTt] = useState<PlatformStatus | null>(null)
   const [x, setX] = useState<PlatformStatus | null>(null)
+  const [yt, setYt] = useState<PlatformStatus | null>(null)
   const [brand, setBrand] = useState<BrandProfile | null>(null)
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [activity, setActivity] = useState<RunLogEntry[] | null>(null)
@@ -31,12 +33,13 @@ export function Dashboard() {
   const pollRef = useRef<number | null>(null)
 
   async function load() {
-    const [igRes, fbRes, liRes, ttRes, xRes, brandRes, postsRes, activityRes] = await Promise.all([
+    const [igRes, fbRes, liRes, ttRes, xRes, ytRes, brandRes, postsRes, activityRes] = await Promise.all([
       api.get<PlatformStatus>("/instagram/status"),
       api.get<PlatformStatus>("/facebook/status"),
       api.get<PlatformStatus>("/linkedin/status"),
       api.get<PlatformStatus>("/tiktok/status"),
       api.get<PlatformStatus>("/x/status"),
+      api.get<PlatformStatus>("/youtube/status"),
       api.get<{ brand: BrandProfile | null }>("/brand"),
       api.get<{ posts: Post[] }>("/posts?limit=8"),
       api.get<{ runs: RunLogEntry[] }>("/activity?limit=6"),
@@ -46,6 +49,7 @@ export function Dashboard() {
     setLi(liRes)
     setTt(ttRes)
     setX(xRes)
+    setYt(ytRes)
     setBrand(brandRes.brand)
     setPosts(postsRes.posts)
     setActivity(activityRes.runs)
@@ -98,6 +102,7 @@ export function Dashboard() {
     { key: "linkedin", label: "LinkedIn", icon: Briefcase, ok: Boolean(li?.connected) },
     { key: "tiktok", label: "TikTok", icon: Music2, ok: Boolean(tt?.connected) },
     { key: "x", label: "X", icon: XLogo, ok: Boolean(x?.connected) },
+    { key: "youtube", label: "YouTube", icon: YouTubeLogo, ok: Boolean(yt?.connected) },
     { key: "brand", label: "Brand profile", icon: ClipboardCheck, ok: brandReady },
   ]
 

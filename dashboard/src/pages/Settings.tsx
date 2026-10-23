@@ -5,7 +5,10 @@ import { useSearchParams } from "react-router-dom"
 import { api } from "../api/client"
 import { Button, Input, Label, PageHeader, Spinner, Textarea } from "../components/ui"
 import { TagList } from "../components/TagList"
+import { CountrySelect } from "../components/CountrySelect"
+import { ReferencePhotos } from "../components/ReferencePhotos"
 import { XLogo } from "../components/XLogo"
+import { YouTubeLogo } from "../components/YouTubeLogo"
 import { useAuth } from "../lib/auth"
 import type { BrandProfile } from "../lib/types"
 
@@ -40,6 +43,12 @@ interface XStatus {
   connected_at?: string
 }
 
+interface YouTubeStatus {
+  connected: boolean
+  channel_title?: string
+  connected_at?: string
+}
+
 interface FacebookPage {
   id: string
   name: string
@@ -64,6 +73,7 @@ export function Settings() {
   const [li, setLi] = useState<LinkedInStatus | null>(null)
   const [tt, setTt] = useState<TikTokStatus | null>(null)
   const [x, setX] = useState<XStatus | null>(null)
+  const [yt, setYt] = useState<YouTubeStatus | null>(null)
   const [fbPages, setFbPages] = useState<FacebookPage[] | null>(null)
 
   async function loadBrand() {
@@ -95,6 +105,10 @@ export function Settings() {
     setX(await api.get<XStatus>("/x/status"))
   }
 
+  async function loadYouTube() {
+    setYt(await api.get<YouTubeStatus>("/youtube/status"))
+  }
+
   useEffect(() => {
     loadBrand()
     loadInstagram()
@@ -102,6 +116,7 @@ export function Settings() {
     loadLinkedIn()
     loadTikTok()
     loadX()
+    loadYouTube()
   }, [])
 
   function update<K extends keyof BrandProfile>(key: K, value: BrandProfile[K]) {
@@ -153,6 +168,11 @@ export function Settings() {
     await loadX()
   }
 
+  async function disconnectYouTube() {
+    await api.delete("/youtube/connection")
+    await loadYouTube()
+  }
+
   const notice = (platform: string, result: string | null) => {
     if (!result) return null
     if (result === "connected") return { tone: "ok" as const, text: `${platform} connected successfully.` }
@@ -168,6 +188,7 @@ export function Settings() {
     notice("LinkedIn", searchParams.get("linkedin")),
     notice("TikTok", searchParams.get("tiktok")),
     notice("X", searchParams.get("x")),
+    notice("YouTube", searchParams.get("youtube")),
   ].filter((n): n is { tone: "ok" | "err"; text: string } => Boolean(n))
 
   return (
@@ -290,6 +311,14 @@ export function Settings() {
                 connectHref="/api/x/connect"
                 onDisconnect={disconnectX}
               />
+              <IntegrationRow
+                icon={YouTubeLogo}
+                name="YouTube"
+                status={yt}
+                connectedLabel={yt?.connected ? (yt.channel_title ? `Connected as ${yt.channel_title}` : "Connected") : undefined}
+                connectHref="/api/youtube/connect"
+                onDisconnect={disconnectYouTube}
+              />
             </div>
           )}
 
@@ -330,6 +359,13 @@ export function Settings() {
                   </div>
                 </div>
                 <div>
+                  <Label>Target country</Label>
+                  <CountrySelect value={brand.target_country ?? ""} onChange={(c) => update("target_country", c)} />
+                  <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+                    Your calendar shows this country's holidays and occasions. Changing it writes posts for its upcoming events.
+                  </p>
+                </div>
+                <div>
                   <Label>Niche</Label>
                   <Textarea rows={2} value={brand.niche} onChange={(e) => update("niche", e.target.value)} />
                 </div>
@@ -337,15 +373,9 @@ export function Settings() {
                   <Label>Audience</Label>
                   <Textarea rows={2} value={brand.audience} onChange={(e) => update("audience", e.target.value)} />
                 </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label>Tone</Label>
-                    <Input value={brand.tone} onChange={(e) => update("tone", e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Voice</Label>
-                    <Input value={brand.tts_voice} onChange={(e) => update("tts_voice", e.target.value)} />
-                  </div>
+                <div>
+                  <Label>Tone</Label>
+                  <Input value={brand.tone} onChange={(e) => update("tone", e.target.value)} />
                 </div>
                 <div>
                   <Label>Content pillars</Label>
@@ -364,6 +394,17 @@ export function Settings() {
                     <Label>Hashtag style</Label>
                     <Input value={brand.hashtag_style} onChange={(e) => update("hashtag_style", e.target.value)} />
                   </div>
+                </div>
+                <div>
+                  <Label>Reference photos</Label>
+                  <p className="-mt-1 mb-2.5 text-[11px] text-[var(--color-text-faint)]">
+                    Add photos of yourself or your real products. AI images and YouTube thumbnails keep that exact
+                    face or product. Saved right away, up to 6.
+                  </p>
+                  <ReferencePhotos
+                    photos={brand.reference_images ?? []}
+                    onChange={(photos) => setBrand((b) => (b ? { ...b, reference_images: photos } : b))}
+                  />
                 </div>
                 <div className="flex items-center justify-end gap-3">
                   <AnimatePresence>

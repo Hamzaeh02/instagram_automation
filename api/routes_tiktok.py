@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from starlette.responses import RedirectResponse
 
-from api.auth import require_auth
+from api.auth import require_auth, require_workspace
 from common.config import settings
 from common.logging import get_logger
 from common.timeutil import utc_iso
-from db.models import TikTokConnection, User
+from db.models import TikTokConnection, User, Workspace
 from db.session import get_session
 
 logger = get_logger(__name__)
@@ -30,10 +30,10 @@ def _state_serializer() -> URLSafeTimedSerializer:
 
 
 @router.get("/status")
-def status(user: User = Depends(require_auth)):
+def status(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(TikTokConnection).filter(TikTokConnection.user_id == user.id).first()
+        conn = session.query(TikTokConnection).filter(TikTokConnection.workspace_id == workspace.id).first()
         if not conn or not conn.access_token:
             return {"connected": False}
         return {"connected": True, "username": conn.username, "connected_at": utc_iso(conn.connected_at)}
@@ -42,13 +42,13 @@ def status(user: User = Depends(require_auth)):
 
 
 @router.get("/connect")
-def connect(user: User = Depends(require_auth)):
+def connect(user: User = Depends(require_auth), workspace: Workspace = Depends(require_workspace)):
     if not (settings.tiktok_client_key and settings.tiktok_oauth_redirect_uri):
         raise HTTPException(
             status_code=500,
             detail="TikTok connect isn't configured on the server (TIKTOK_CLIENT_KEY / TIKTOK_OAUTH_REDIRECT_URI)",
         )
-    state = _state_serializer().dumps({"user_id": user.id})
+    state = _state_serializer().dumps({"user_id": user.id, "workspace_id": workspace.id})
     params = {
         "client_key": settings.tiktok_client_key,
         "response_type": "code",
@@ -72,6 +72,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
     try:
         data = _state_serializer().loads(state, max_age=STATE_MAX_AGE_SECONDS)
         user_id = data["user_id"]
+        workspace_id = data["workspace_id"]
     except (BadSignature, KeyError) as exc:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state") from exc
 
@@ -112,17 +113,18 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
     session = get_session()
     try:
-        conn = session.query(TikTokConnection).filter(TikTokConnection.user_id == user_id).first()
+        conn = session.query(TikTokConnection).filter(TikTokConnection.workspace_id == workspace_id).first()
         if not conn:
-            conn = TikTokConnection(user_id=user_id)
+            conn = TikTokConnection(user_id=user_id, workspace_id=workspace_id)
             session.add(conn)
+        conn.connected_at = dt.datetime.utcnow()
         conn.access_token = access_token
         conn.refresh_token = refresh_token
         conn.token_expires_at = dt.datetime.utcnow() + dt.timedelta(seconds=expires_in)
         conn.open_id = open_id
         conn.username = username
         session.commit()
-        logger.info("TikTok connected for user %s: @%s", user_id, username)
+        logger.info("TikTok connected for workspace %s: @%s", workspace_id, username)
     finally:
         session.close()
 
@@ -130,10 +132,10 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
 
 @router.delete("/connection")
-def disconnect(user: User = Depends(require_auth)):
+def disconnect(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(TikTokConnection).filter(TikTokConnection.user_id == user.id).first()
+        conn = session.query(TikTokConnection).filter(TikTokConnection.workspace_id == workspace.id).first()
         if conn:
             session.delete(conn)
             session.commit()

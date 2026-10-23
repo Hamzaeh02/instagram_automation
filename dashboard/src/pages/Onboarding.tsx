@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { api, ApiError } from "../api/client"
 import { Button, FieldLabelRow, Input, Label, Textarea } from "../components/ui"
+import { CountrySelect, guessCountry, useCountries } from "../components/CountrySelect"
 import { TagList } from "../components/TagList"
 import { AiImproveButton } from "../components/AiImproveButton"
 import type { BrandProfile } from "../lib/types"
@@ -11,15 +12,6 @@ import type { BrandProfile } from "../lib/types"
 function brandContext(form: BrandProfile): Record<string, string> {
   return { brand_name: form.brand_name, niche: form.niche, audience: form.audience, tone: form.tone }
 }
-
-const VOICES = [
-  { id: "en-US-GuyNeural", label: "Guy — US, confident male" },
-  { id: "en-US-JennyNeural", label: "Jenny — US, warm female" },
-  { id: "en-US-AriaNeural", label: "Aria — US, upbeat female" },
-  { id: "en-GB-RyanNeural", label: "Ryan — UK, calm male" },
-  { id: "en-GB-SoniaNeural", label: "Sonia — UK, bright female" },
-  { id: "en-AU-NatashaNeural", label: "Natasha — AU, energetic female" },
-]
 
 const EMPTY: BrandProfile = {
   brand_name: "",
@@ -35,9 +27,10 @@ const EMPTY: BrandProfile = {
   heygen_avatar_id: "",
   heygen_voice_id: "",
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  target_country: "",
 }
 
-const STEPS = ["Brand", "Audience", "Content", "Cadence", "Voice", "Review"]
+const STEPS = ["Brand", "Audience", "Content", "Cadence", "Review"]
 
 export function Onboarding() {
   const navigate = useNavigate()
@@ -68,7 +61,7 @@ export function Onboarding() {
     setError(null)
     try {
       await api.put("/brand", form)
-      navigate("/")
+      navigate("/dashboard")
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save your profile")
     } finally {
@@ -116,8 +109,7 @@ export function Onboarding() {
               {step === 1 && <StepAudience form={form} update={update} />}
               {step === 2 && <StepContent form={form} update={update} />}
               {step === 3 && <StepCadence form={form} update={update} />}
-              {step === 4 && <StepVoice form={form} update={update} />}
-              {step === 5 && <StepReview form={form} />}
+              {step === 4 && <StepReview form={form} />}
             </motion.div>
           </AnimatePresence>
 
@@ -245,6 +237,7 @@ function StepAudience({ form, update }: StepProps) {
           onChange={(e) => update("audience", e.target.value)}
         />
       </div>
+      <TargetCountry form={form} update={update} />
       <div>
         <FieldLabelRow
           label="Brand voice / tone"
@@ -356,28 +349,22 @@ function StepCadence({ form, update }: StepProps) {
   )
 }
 
-function StepVoice({ form, update }: StepProps) {
+function TargetCountry({ form, update }: StepProps) {
+  const countries = useCountries()
+  useEffect(() => {
+    if (!form.target_country && countries.length) {
+      const guess = guessCountry(countries)
+      if (guess) update("target_country", guess)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countries.length])
   return (
-    <div className="space-y-5">
-      <h2 className="font-[var(--font-display)] text-lg font-bold">Pick a voiceover</h2>
-      <p className="text-xs text-[var(--color-text-muted)]">Used for every generated video's narration.</p>
-      <div className="grid grid-cols-2 gap-3">
-        {VOICES.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            onClick={() => update("tts_voice", v.id)}
-            className={
-              "rounded-md border p-3.5 text-left text-sm transition " +
-              (form.tts_voice === v.id
-                ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-text)]"
-                : "border-[var(--color-border)] bg-black/[0.02] text-[var(--color-text-muted)] hover:bg-black/5")
-            }
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
+    <div>
+      <Label>Target country</Label>
+      <CountrySelect value={form.target_country ?? ""} onChange={(c) => update("target_country", c)} />
+      <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+        Your calendar shows this country's holidays and occasions, and we'll write posts for them automatically.
+      </p>
     </div>
   )
 }
@@ -390,7 +377,7 @@ function StepReview({ form }: { form: BrandProfile }) {
     ["Tone", form.tone],
     ["Pillars", form.content_pillars.join(", ") || "—"],
     ["Cadence", `${form.posting_cadence_per_week}x / week`],
-    ["Voice", form.tts_voice],
+    ["Country", form.target_country || "—"],
   ]
   return (
     <div className="space-y-5">

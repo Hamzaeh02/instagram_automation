@@ -7,7 +7,7 @@ from pydantic import BaseModel, field_validator
 
 from common.config import settings
 from common.logging import get_logger
-from db.models import BrandProfile, User
+from db.models import BrandProfile, User, Workspace
 from db.session import get_session
 
 logger = get_logger(__name__)
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 COOKIE_NAME = "ia_session"
 MAX_AGE_SECONDS = 30 * 24 * 3600
+WORKSPACE_COOKIE_NAME = "ia_workspace"
 
 
 def _serializer() -> URLSafeTimedSerializer:
@@ -33,6 +34,14 @@ def _verify_password(password: str, password_hash: str) -> bool:
 def _set_session_cookie(response: Response, user_id: int) -> None:
     token = _serializer().dumps({"user_id": user_id})
     response.set_cookie(COOKIE_NAME, token, max_age=MAX_AGE_SECONDS, httponly=True, samesite="lax")
+
+
+def _set_workspace_cookie(response: Response, workspace_id: int) -> None:
+    # Unsigned - unlike the session cookie, this one is just a hint. Every
+    # reader (require_workspace) re-validates that the id actually belongs
+    # to the authenticated user before trusting it, so tampering just gets
+    # ignored/falls back, never grants access to someone else's workspace.
+    response.set_cookie(WORKSPACE_COOKIE_NAME, str(workspace_id), max_age=MAX_AGE_SECONDS, httponly=True, samesite="lax")
 
 
 class SignupRequest(BaseModel):
@@ -77,10 +86,16 @@ def signup(body: SignupRequest, response: Response):
         session.commit()
         session.refresh(user)
 
-        session.add(BrandProfile(user_id=user.id))
+        workspace = Workspace(user_id=user.id, name="My Workspace")
+        session.add(workspace)
+        session.commit()
+        session.refresh(workspace)
+
+        session.add(BrandProfile(user_id=user.id, workspace_id=workspace.id))
         session.commit()
 
         _set_session_cookie(response, user.id)
+        _set_workspace_cookie(response, workspace.id)
         return _user_out(user)
     finally:
         session.close()
@@ -96,6 +111,11 @@ def login(body: LoginRequest, response: Response):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
 
         _set_session_cookie(response, user.id)
+        first_workspace = (
+            session.query(Workspace).filter(Workspace.user_id == user.id).order_by(Workspace.id).first()
+        )
+        if first_workspace:
+            _set_workspace_cookie(response, first_workspace.id)
         return _user_out(user)
     finally:
         session.close()
@@ -132,6 +152,46 @@ def require_auth(ia_session: str | None = Cookie(default=None)) -> User:
             raise HTTPException(status_code=401, detail="Not authenticated")
         session.expunge(user)
         return user
+    finally:
+        session.close()
+
+
+def require_workspace(
+    response: Response,
+    user: User = Depends(require_auth),
+    ia_workspace: str | None = Cookie(default=None),
+) -> Workspace:
+    """FastAPI dependency: resolves the active workspace for the
+    authenticated user - this, not user_id, is the real tenant-isolation
+    boundary everywhere below auth. The workspace id cookie is just a
+    preference; it's always re-validated against the authenticated user
+    (never trusted on its own), and falls back to - then persists - the
+    user's oldest workspace if the cookie is missing, invalid, or points at
+    a workspace that isn't theirs. Every user has at least one workspace
+    (created at signup), so this never needs to handle "zero workspaces"."""
+    session = get_session()
+    try:
+        workspace: Workspace | None = None
+        if ia_workspace:
+            try:
+                candidate_id = int(ia_workspace)
+            except ValueError:
+                candidate_id = None
+            if candidate_id is not None:
+                candidate = session.get(Workspace, candidate_id)
+                if candidate and candidate.user_id == user.id:
+                    workspace = candidate
+
+        if workspace is None:
+            workspace = (
+                session.query(Workspace).filter(Workspace.user_id == user.id).order_by(Workspace.id).first()
+            )
+            if workspace is None:
+                raise HTTPException(status_code=500, detail="No workspace found for this account")
+            _set_workspace_cookie(response, workspace.id)
+
+        session.expunge(workspace)
+        return workspace
     finally:
         session.close()
 

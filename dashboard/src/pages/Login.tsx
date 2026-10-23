@@ -3,6 +3,7 @@ import { Lock, Mail, Sparkles } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { ApiError } from "../api/client"
+import { AuthFooter } from "../components/AuthFooter"
 import { Button, Input, Label } from "../components/ui"
 import { Scene3D } from "../components/Scene3D"
 import { useAuth } from "../lib/auth"
@@ -92,6 +93,7 @@ export function Login() {
             Create an account
           </Link>
         </p>
+        <AuthFooter />
       </motion.div>
     </div>
   )

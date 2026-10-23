@@ -20,6 +20,15 @@ def cmd_init_db(_args) -> None:
     print("Database initialized.")
 
 
+def _get_workspace_for_user(session, user):
+    from db.models import Workspace
+
+    workspace = session.query(Workspace).filter(Workspace.user_id == user.id).order_by(Workspace.id).first()
+    if not workspace:
+        raise SystemExit(f"No workspace found for {user.email!r}.")
+    return workspace
+
+
 def cmd_plan(args) -> None:
     from db.models import BrandProfile
     from strategy.generate_calendar import generate_calendar
@@ -28,12 +37,13 @@ def cmd_plan(args) -> None:
     session = get_session()
     try:
         user = _get_user_by_email(session, args.user)
-        brand = session.query(BrandProfile).filter(BrandProfile.user_id == user.id).first()
+        workspace = _get_workspace_for_user(session, user)
+        brand = session.query(BrandProfile).filter(BrandProfile.workspace_id == workspace.id).first()
         if not brand or not brand.niche:
             raise SystemExit("This user's brand profile isn't set up yet (set it via the dashboard).")
 
         start = dt.date.fromisoformat(args.start) if args.start else dt.date.today()
-        created = generate_calendar(session, brand, user.id, start, args.days)
+        created = generate_calendar(session, brand, user.id, workspace.id, start, args.days)
         print(f"Created {len(created)} planned posts for {user.email}.")
         for post in created:
             print(f"  {post.scheduled_at}  [{post.pillar}]  {post.title}")
@@ -50,8 +60,9 @@ def cmd_show(args) -> None:
     session = get_session()
     try:
         user = _get_user_by_email(session, args.user)
+        workspace = _get_workspace_for_user(session, user)
         posts = session.scalars(
-            select(Post).where(Post.user_id == user.id).order_by(Post.scheduled_at)
+            select(Post).where(Post.workspace_id == workspace.id).order_by(Post.scheduled_at)
         ).all()
         for post in posts:
             print(f"{post.id:4d}  {post.scheduled_at}  {post.status:24s}  {post.title}")
@@ -72,18 +83,18 @@ def cmd_users(_args) -> None:
 
 
 def cmd_run_once(args) -> None:
-    from orchestrator.daily import run_once_all_users, run_once_for_user
+    from orchestrator.daily import run_once_all_workspaces, run_once_for_workspace
 
     if args.user:
         session = get_session()
         try:
             user = _get_user_by_email(session, args.user)
-            user_id = user.id
+            workspace_id = _get_workspace_for_user(session, user).id
         finally:
             session.close()
-        run_once_for_user(user_id)
+        run_once_for_workspace(workspace_id)
     else:
-        run_once_all_users()
+        run_once_all_workspaces()
 
 
 def main() -> None:
@@ -96,7 +107,7 @@ def main() -> None:
     plan_parser = sub.add_parser("plan", help="Generate the content calendar for one user")
     plan_parser.add_argument("--user", required=True, help="User's email")
     plan_parser.add_argument("--start", help="Start date YYYY-MM-DD (default: today)")
-    plan_parser.add_argument("--days", type=int, default=90, help="Number of days to plan (default: 90)")
+    plan_parser.add_argument("--days", type=int, default=30, help="Number of days to plan (default: 30)")
     plan_parser.set_defaults(func=cmd_plan)
 
     show_parser = sub.add_parser("show", help="List one user's planned/posted content")

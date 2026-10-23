@@ -3,6 +3,7 @@ import { Lock, Mail, Sparkles } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { ApiError } from "../api/client"
+import { AuthFooter } from "../components/AuthFooter"
 import { Button, Input, Label } from "../components/ui"
 import { Scene3D } from "../components/Scene3D"
 import { useAuth } from "../lib/auth"
@@ -88,6 +89,11 @@ export function Signup() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account…" : "Create account"}
           </Button>
+          <p className="text-center text-xs text-[var(--color-text-faint)]">
+            By creating an account you agree to our{" "}
+            <a href="/terms" className="text-[var(--color-text-muted)] underline">Terms of Service</a> and{" "}
+            <a href="/privacy" className="text-[var(--color-text-muted)] underline">Privacy Policy</a>.
+          </p>
         </form>
 
         <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">
@@ -96,6 +102,7 @@ export function Signup() {
             Sign in
           </Link>
         </p>
+        <AuthFooter />
       </motion.div>
     </div>
   )

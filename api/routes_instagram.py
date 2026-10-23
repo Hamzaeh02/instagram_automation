@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import datetime as dt
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from starlette.responses import RedirectResponse
 
-from api.auth import require_auth
+from api.auth import require_auth, require_workspace
 from common.config import settings
 from common.logging import get_logger
 from common.timeutil import utc_iso
-from db.models import InstagramConnection, User
+from db.models import InstagramConnection, User, Workspace
 from db.session import get_session
 
 logger = get_logger(__name__)
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/api/instagram", tags=["instagram"])
 AUTHORIZE_URL = "https://www.instagram.com/oauth/authorize"
 TOKEN_URL = "https://api.instagram.com/oauth/access_token"
 GRAPH_BASE = "https://graph.instagram.com"
-SCOPES = "instagram_business_basic,instagram_business_content_publish"
+SCOPES = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights,instagram_business_manage_comments,instagram_business_manage_messages"
 STATE_MAX_AGE_SECONDS = 600
 
 
@@ -28,10 +30,10 @@ def _state_serializer() -> URLSafeTimedSerializer:
 
 
 @router.get("/status")
-def status(user: User = Depends(require_auth)):
+def status(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(InstagramConnection).filter(InstagramConnection.user_id == user.id).first()
+        conn = session.query(InstagramConnection).filter(InstagramConnection.workspace_id == workspace.id).first()
         if not conn or not conn.access_token:
             return {"connected": False}
         return {"connected": True, "username": conn.ig_username, "connected_at": utc_iso(conn.connected_at)}
@@ -40,13 +42,17 @@ def status(user: User = Depends(require_auth)):
 
 
 @router.get("/connect")
-def connect(user: User = Depends(require_auth)):
+def connect(user: User = Depends(require_auth), workspace: Workspace = Depends(require_workspace)):
     if not (settings.instagram_app_id and settings.instagram_oauth_redirect_uri):
         raise HTTPException(
             status_code=500,
             detail="Instagram connect isn't configured on the server (INSTAGRAM_APP_ID / INSTAGRAM_OAUTH_REDIRECT_URI)",
         )
-    state = _state_serializer().dumps({"user_id": user.id})
+    # workspace_id rides in the signed state, not just the ia_workspace
+    # cookie, so the connection lands on whichever workspace was active when
+    # "Connect" was clicked even if the active workspace changes (another
+    # tab, etc.) before the OAuth redirect completes.
+    state = _state_serializer().dumps({"user_id": user.id, "workspace_id": workspace.id})
     params = {
         "client_id": settings.instagram_app_id,
         "redirect_uri": settings.instagram_oauth_redirect_uri,
@@ -70,6 +76,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
     try:
         data = _state_serializer().loads(state, max_age=STATE_MAX_AGE_SECONDS)
         user_id = data["user_id"]
+        workspace_id = data["workspace_id"]
     except (BadSignature, KeyError) as exc:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state") from exc
 
@@ -109,15 +116,16 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
     session = get_session()
     try:
-        conn = session.query(InstagramConnection).filter(InstagramConnection.user_id == user_id).first()
+        conn = session.query(InstagramConnection).filter(InstagramConnection.workspace_id == workspace_id).first()
         if not conn:
-            conn = InstagramConnection(user_id=user_id)
+            conn = InstagramConnection(user_id=user_id, workspace_id=workspace_id)
             session.add(conn)
+        conn.connected_at = dt.datetime.utcnow()
         conn.ig_user_id = ig_user_id
         conn.ig_username = username
         conn.access_token = long_token
         session.commit()
-        logger.info("Instagram connected for user %s: @%s", user_id, username)
+        logger.info("Instagram connected for workspace %s: @%s", workspace_id, username)
     finally:
         session.close()
 
@@ -125,10 +133,10 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
 
 @router.delete("/connection")
-def disconnect(user: User = Depends(require_auth)):
+def disconnect(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(InstagramConnection).filter(InstagramConnection.user_id == user.id).first()
+        conn = session.query(InstagramConnection).filter(InstagramConnection.workspace_id == workspace.id).first()
         if conn:
             session.delete(conn)
             session.commit()

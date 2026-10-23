@@ -1,77 +1,45 @@
 from __future__ import annotations
 
 import datetime as dt
-import os
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.auth import require_auth
+from api.auth import require_auth, require_workspace
 from api.routes_brand import get_profile
 from common.config import settings
 from common.logging import get_logger
-from db.models import Post, PostStatus, User
+from db.models import User, Workspace
 from db.session import get_session
-from orchestrator.daily import _contains_banned_topic
-from storage.upload import upload_video
+from orchestrator.daily import design_posts
 from strategy.generate_calendar import generate_single_post
-from video.generate import generate_video_for_post
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/create", tags=["create"], dependencies=[Depends(require_auth)])
-
-VIDEO_DIR = "./data/videos"
 
 
 class CreateRequest(BaseModel):
     prompt: str
     scheduled_at: str | None = None
-
-
-def _generate_video_safely(post_id: int, user_id: int) -> None:
-    session = get_session()
-    post = None
-    try:
-        post = session.get(Post, post_id)
-        if not post:
-            return
-        brand = get_profile(session, user_id)
-
-        banned = _contains_banned_topic(post, brand.banned_topics or []) if brand else None
-        if banned:
-            post.status = PostStatus.NEEDS_MANUAL_EDIT.value
-            post.error_message = f"Contains banned topic: {banned}"
-            session.commit()
-            return
-
-        post.status = PostStatus.VIDEO_GENERATING.value
-        session.commit()
-
-        os.makedirs(VIDEO_DIR, exist_ok=True)
-        final_path = generate_video_for_post(post, VIDEO_DIR, brand)
-        post.video_local_path = final_path
-        post.video_url = upload_video(final_path, key=f"users/{user_id}/post_{post.id}.mp4")
-        post.status = PostStatus.PENDING_REVIEW.value
-        session.commit()
-        logger.info("On-demand video ready for post %s", post_id)
-    except Exception as exc:
-        logger.exception("On-demand video generation failed for post %s", post_id)
-        if post:
-            post.status = PostStatus.FAILED.value
-            post.error_message = str(exc)
-            session.commit()
-    finally:
-        session.close()
+    content_type: str = "video"  # video (Reel the creator films) | post (photo)
 
 
 @router.post("")
-def create_post(body: CreateRequest, background_tasks: BackgroundTasks, user: User = Depends(require_auth)):
+def create_post(
+    body: CreateRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_auth),
+    workspace: Workspace = Depends(require_workspace),
+):
+    """Claude researches the topic on the web and writes one complete post."""
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="Describe what you want this post to be about")
+    if body.content_type not in ("video", "post"):
+        raise HTTPException(status_code=400, detail="content_type must be 'video' or 'post'")
 
     session = get_session()
     try:
-        brand = get_profile(session, user.id)
+        brand = get_profile(session, workspace.id)
         if not brand or not brand.niche:
             raise HTTPException(status_code=400, detail="Set up your brand profile before creating content")
 
@@ -80,9 +48,15 @@ def create_post(body: CreateRequest, background_tasks: BackgroundTasks, user: Us
             if body.scheduled_at
             else dt.datetime.now() + dt.timedelta(days=settings.video_gen_lead_days)
         )
-        post = generate_single_post(session, brand, user.id, body.prompt.strip(), scheduled_at)
+        try:
+            post = generate_single_post(
+                session, brand, user.id, workspace.id, body.prompt.strip(), scheduled_at, content_type=body.content_type
+            )
+        except Exception as exc:
+            logger.exception("Create with AI failed for workspace %s", workspace.id)
+            raise HTTPException(status_code=502, detail=f"Couldn't write that post: {exc}") from exc
+        if post.media_type == "IMAGE":
+            background_tasks.add_task(design_posts, workspace.id, [post.id])
+        return {"id": post.id, "status": post.status}
     finally:
         session.close()
-
-    background_tasks.add_task(_generate_video_safely, post.id, user.id)
-    return {"id": post.id, "status": "video_generating"}

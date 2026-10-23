@@ -11,10 +11,15 @@ import { AuthProvider, useAuth } from "./lib/auth"
 // load even though it's only ever rendered on the two auth pages. Splitting
 // every page keeps that (and any future heavy page) out of the initial
 // payload entirely; each page's JS loads only when actually navigated to.
+const Landing = lazy(() => import("./pages/Landing").then((m) => ({ default: m.Landing })))
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })))
 const Signup = lazy(() => import("./pages/Signup").then((m) => ({ default: m.Signup })))
 const Onboarding = lazy(() => import("./pages/Onboarding").then((m) => ({ default: m.Onboarding })))
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })))
+const Analytics = lazy(() => import("./pages/Analytics").then((m) => ({ default: m.Analytics })))
+const ContentInsights = lazy(() => import("./pages/ContentInsights").then((m) => ({ default: m.ContentInsights })))
+const Messages = lazy(() => import("./pages/Messages").then((m) => ({ default: m.Messages })))
+const Competitors = lazy(() => import("./pages/Competitors").then((m) => ({ default: m.Competitors })))
 const Calendar = lazy(() => import("./pages/Calendar").then((m) => ({ default: m.Calendar })))
 const Upload = lazy(() => import("./pages/Upload").then((m) => ({ default: m.Upload })))
 const PostDetail = lazy(() => import("./pages/PostDetail").then((m) => ({ default: m.PostDetail })))
@@ -32,6 +37,7 @@ function AnonRoutes() {
   return (
     <Suspense fallback={<FullScreenSpinner />}>
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
@@ -90,12 +96,17 @@ function AuthedApp() {
             <Shell>
               <Suspense fallback={<FullScreenSpinner />}>
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/overview" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<Analytics />} />
+                  <Route path="/insights" element={<ContentInsights />} />
+                  <Route path="/messages" element={<Messages />} />
+                  <Route path="/competitors" element={<Competitors />} />
                   <Route path="/upload" element={<Upload />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/posts/:id" element={<PostDetail />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
               </Suspense>
             </Shell>

@@ -11,7 +11,7 @@ export type PostStatus =
 
 export type PostSource = "ai_generated" | "user_uploaded"
 
-export type Platform = "instagram" | "facebook" | "linkedin" | "tiktok" | "x"
+export type Platform = "instagram" | "facebook" | "linkedin" | "tiktok" | "x" | "youtube"
 
 export interface PostPublication {
   platform: Platform
@@ -19,6 +19,39 @@ export interface PostPublication {
   permalink: string
   error_message: string
   published_at: string | null
+}
+
+export type YouTubePrivacy = "public" | "unlisted" | "private"
+
+export interface YouTubeOptions {
+  title?: string
+  description?: string
+  tags?: string[]
+  category_id?: string
+  privacy?: YouTubePrivacy
+  made_for_kids?: boolean
+  playlist_id?: string
+  notify_subscribers?: boolean
+  embeddable?: boolean
+  license?: "youtube" | "creativeCommon"
+  default_language?: string
+  captions_language?: string
+  // read-only, from the server
+  has_thumbnail?: boolean
+  captions_filename?: string
+}
+
+export interface PostScoreCheck {
+  key: string
+  status: "pass" | "warn" | "fail"
+  label: string
+  tip: string
+}
+
+export interface PostScore {
+  overall: number
+  grade: string
+  platforms: { platform: Platform; label: string; score: number; checks: PostScoreCheck[] }[]
 }
 
 export interface Post {
@@ -35,7 +68,13 @@ export interface Post {
   hashtags: string
   title: string
   broll_keywords: string
+  image_prompt: string
+  research_notes: string
+  sources: string[]
   target_platforms: Platform[]
+  youtube_options: YouTubeOptions
+  event_key?: string
+  score: PostScore
   publications: PostPublication[]
   status: PostStatus
   retry_count: number
@@ -63,6 +102,14 @@ export interface BrandProfile {
   timezone: string
   content_brief?: string
   content_type?: "video" | "post"
+  target_country?: string
+  reference_images?: { id: string; label: string }[]
+}
+
+export interface Workspace {
+  id: number
+  name: string
+  active: boolean
 }
 
 export interface RunLogEntry {
@@ -77,7 +124,7 @@ export interface RunLogEntry {
 export const STATUS_LABEL: Record<PostStatus, string> = {
   planned: "Planned",
   video_generating: "Generating video",
-  image_generating: "Finding photo",
+  image_generating: "Making image",
   pending_review: "Pending review",
   approved: "Approved",
   needs_manual_edit: "Needs manual edit",

@@ -10,11 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from starlette.responses import RedirectResponse
 
-from api.auth import require_auth
+from api.auth import require_auth, require_workspace
 from common.config import settings
 from common.logging import get_logger
 from common.timeutil import utc_iso
-from db.models import User, XConnection
+from db.models import User, Workspace, XConnection
 from db.session import get_session
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ ME_URL = "https://api.x.com/2/users/me"
 # offline.access is what makes X issue a refresh_token alongside the (~2h
 # lived) access_token - without it we'd have to send the user through OAuth
 # again every couple of hours.
-SCOPES = "tweet.read tweet.write users.read offline.access"
+SCOPES = "tweet.read tweet.write users.read like.read like.write tweet.moderate.write dm.read dm.write offline.access"
 STATE_MAX_AGE_SECONDS = 600
 
 
@@ -46,10 +46,10 @@ def _pkce_pair() -> tuple[str, str]:
 
 
 @router.get("/status")
-def status(user: User = Depends(require_auth)):
+def status(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(XConnection).filter(XConnection.user_id == user.id).first()
+        conn = session.query(XConnection).filter(XConnection.workspace_id == workspace.id).first()
         if not conn or not conn.access_token:
             return {"connected": False}
         return {"connected": True, "username": conn.username, "connected_at": utc_iso(conn.connected_at)}
@@ -58,14 +58,14 @@ def status(user: User = Depends(require_auth)):
 
 
 @router.get("/connect")
-def connect(user: User = Depends(require_auth)):
+def connect(user: User = Depends(require_auth), workspace: Workspace = Depends(require_workspace)):
     if not (settings.x_client_id and settings.x_oauth_redirect_uri):
         raise HTTPException(
             status_code=500,
             detail="X connect isn't configured on the server (X_CLIENT_ID / X_OAUTH_REDIRECT_URI)",
         )
     verifier, challenge = _pkce_pair()
-    state = _state_serializer().dumps({"user_id": user.id, "code_verifier": verifier})
+    state = _state_serializer().dumps({"user_id": user.id, "workspace_id": workspace.id, "code_verifier": verifier})
     params = {
         "response_type": "code",
         "client_id": settings.x_client_id,
@@ -91,6 +91,7 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
     try:
         data = _state_serializer().loads(state, max_age=STATE_MAX_AGE_SECONDS)
         user_id = data["user_id"]
+        workspace_id = data["workspace_id"]
         code_verifier = data["code_verifier"]
     except (BadSignature, KeyError) as exc:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state") from exc
@@ -120,17 +121,18 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
     session = get_session()
     try:
-        conn = session.query(XConnection).filter(XConnection.user_id == user_id).first()
+        conn = session.query(XConnection).filter(XConnection.workspace_id == workspace_id).first()
         if not conn:
-            conn = XConnection(user_id=user_id)
+            conn = XConnection(user_id=user_id, workspace_id=workspace_id)
             session.add(conn)
+        conn.connected_at = dt.datetime.utcnow()
         conn.access_token = access_token
         conn.refresh_token = refresh_token
         conn.token_expires_at = dt.datetime.utcnow() + dt.timedelta(seconds=expires_in)
         conn.x_user_id = x_user_id
         conn.username = username
         session.commit()
-        logger.info("X connected for user %s: @%s", user_id, username)
+        logger.info("X connected for workspace %s: @%s", workspace_id, username)
     finally:
         session.close()
 
@@ -138,10 +140,10 @@ def callback(code: str | None = None, state: str | None = None, error: str | Non
 
 
 @router.delete("/connection")
-def disconnect(user: User = Depends(require_auth)):
+def disconnect(workspace: Workspace = Depends(require_workspace)):
     session = get_session()
     try:
-        conn = session.query(XConnection).filter(XConnection.user_id == user.id).first()
+        conn = session.query(XConnection).filter(XConnection.workspace_id == workspace.id).first()
         if conn:
             session.delete(conn)
             session.commit()

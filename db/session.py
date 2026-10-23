@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from common.config import settings
+from db.migrate_columns import migrate_columns
+from db.migrate_workspaces import migrate_workspaces
 from db.models import Base
 
 _db_path = settings.database_url.replace("sqlite:///", "")
@@ -40,6 +42,8 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    migrate_workspaces(engine)
+    migrate_columns(engine)
 
 
 def get_session() -> Session:
