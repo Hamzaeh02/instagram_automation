@@ -9,13 +9,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = options.body instanceof FormData
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers: isFormData
+      ? { ...options.headers }
+      : { "Content-Type": "application/json", ...options.headers },
   })
 
   if (!res.ok) {
@@ -25,6 +25,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       detail = body.detail || detail
     } catch {
       // ignore
+    }
+    // A 401 anywhere but the auth endpoints themselves means the session
+    // cookie expired or was invalidated mid-use - every page up to now had
+    // no way to detect this, so API calls would just silently fail one by
+    // one while the UI kept acting like the user was still logged in. Send
+    // them back to login instead of leaving every page broken in place.
+    if (res.status === 401 && !path.startsWith("/auth/")) {
+      window.location.href = "/login"
     }
     throw new ApiError(res.status, detail)
   }
@@ -41,4 +49,6 @@ export const api = {
     request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  upload: <T>(path: string, formData: FormData) => request<T>(path, { method: "POST", body: formData }),
 }

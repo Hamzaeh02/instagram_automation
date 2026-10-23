@@ -1,6 +1,7 @@
 export type PostStatus =
   | "planned"
   | "video_generating"
+  | "image_generating"
   | "pending_review"
   | "approved"
   | "needs_manual_edit"
@@ -8,9 +9,56 @@ export type PostStatus =
   | "posted"
   | "failed"
 
+export type PostSource = "ai_generated" | "user_uploaded"
+
+export type Platform = "instagram" | "facebook" | "linkedin" | "tiktok" | "x" | "youtube"
+
+export interface PostPublication {
+  platform: Platform
+  status: "pending" | "publishing" | "posted" | "failed"
+  permalink: string
+  error_message: string
+  published_at: string | null
+}
+
+export type YouTubePrivacy = "public" | "unlisted" | "private"
+
+export interface YouTubeOptions {
+  title?: string
+  description?: string
+  tags?: string[]
+  category_id?: string
+  privacy?: YouTubePrivacy
+  made_for_kids?: boolean
+  playlist_id?: string
+  notify_subscribers?: boolean
+  embeddable?: boolean
+  license?: "youtube" | "creativeCommon"
+  default_language?: string
+  captions_language?: string
+  // read-only, from the server
+  has_thumbnail?: boolean
+  captions_filename?: string
+}
+
+export interface PostScoreCheck {
+  key: string
+  status: "pass" | "warn" | "fail"
+  label: string
+  tip: string
+}
+
+export interface PostScore {
+  overall: number
+  grade: string
+  platforms: { platform: Platform; label: string; score: number; checks: PostScoreCheck[] }[]
+}
+
 export interface Post {
   id: number
-  scheduled_date: string
+  source: PostSource
+  media_type: "REELS" | "IMAGE"
+  scheduled_at: string
   pillar: string
   hook: string
   video_concept: string
@@ -20,13 +68,20 @@ export interface Post {
   hashtags: string
   title: string
   broll_keywords: string
+  image_prompt: string
+  research_notes: string
+  sources: string[]
+  target_platforms: Platform[]
+  youtube_options: YouTubeOptions
+  event_key?: string
+  score: PostScore
+  publications: PostPublication[]
   status: PostStatus
   retry_count: number
   reject_reason: string
   error_message: string
   has_video: boolean
   video_url: string
-  ig_permalink: string
   created_at: string
   updated_at: string
 }
@@ -45,17 +100,17 @@ export interface BrandProfile {
   heygen_avatar_id: string
   heygen_voice_id: string
   timezone: string
+  content_brief?: string
+  content_type?: "video" | "post"
+  target_country?: string
+  reference_images?: { id: string; label: string }[]
 }
 
-export interface CredentialField {
+export interface Workspace {
+  id: number
   name: string
-  label: string
-  secret: boolean
-  configured: boolean
-  value: string
+  active: boolean
 }
-
-export type CredentialGroups = Record<string, CredentialField[]>
 
 export interface RunLogEntry {
   id: number
@@ -69,6 +124,7 @@ export interface RunLogEntry {
 export const STATUS_LABEL: Record<PostStatus, string> = {
   planned: "Planned",
   video_generating: "Generating video",
+  image_generating: "Making image",
   pending_review: "Pending review",
   approved: "Approved",
   needs_manual_edit: "Needs manual edit",
@@ -80,6 +136,7 @@ export const STATUS_LABEL: Record<PostStatus, string> = {
 export const STATUS_COLOR: Record<PostStatus, string> = {
   planned: "slate",
   video_generating: "amber",
+  image_generating: "amber",
   pending_review: "info",
   approved: "success",
   needs_manual_edit: "danger",

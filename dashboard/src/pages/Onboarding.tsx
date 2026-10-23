@@ -1,20 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { api, ApiError } from "../api/client"
-import { Button, Input, Label, Textarea } from "../components/ui"
+import { Button, FieldLabelRow, Input, Label, Textarea } from "../components/ui"
+import { CountrySelect, guessCountry, useCountries } from "../components/CountrySelect"
 import { TagList } from "../components/TagList"
+import { AiImproveButton } from "../components/AiImproveButton"
 import type { BrandProfile } from "../lib/types"
 
-const VOICES = [
-  { id: "en-US-GuyNeural", label: "Guy — US, confident male" },
-  { id: "en-US-JennyNeural", label: "Jenny — US, warm female" },
-  { id: "en-US-AriaNeural", label: "Aria — US, upbeat female" },
-  { id: "en-GB-RyanNeural", label: "Ryan — UK, calm male" },
-  { id: "en-GB-SoniaNeural", label: "Sonia — UK, bright female" },
-  { id: "en-AU-NatashaNeural", label: "Natasha — AU, energetic female" },
-]
+function brandContext(form: BrandProfile): Record<string, string> {
+  return { brand_name: form.brand_name, niche: form.niche, audience: form.audience, tone: form.tone }
+}
 
 const EMPTY: BrandProfile = {
   brand_name: "",
@@ -30,9 +27,10 @@ const EMPTY: BrandProfile = {
   heygen_avatar_id: "",
   heygen_voice_id: "",
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  target_country: "",
 }
 
-const STEPS = ["Brand", "Audience", "Content", "Cadence", "Voice", "Review"]
+const STEPS = ["Brand", "Audience", "Content", "Cadence", "Review"]
 
 export function Onboarding() {
   const navigate = useNavigate()
@@ -63,7 +61,7 @@ export function Onboarding() {
     setError(null)
     try {
       await api.put("/brand", form)
-      navigate("/")
+      navigate("/dashboard")
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save your profile")
     } finally {
@@ -73,14 +71,15 @@ export function Onboarding() {
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-12">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/4 top-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-[var(--color-accent-from)]/15 blur-[140px]" />
-        <div className="absolute right-0 top-1/3 h-[500px] w-[500px] rounded-full bg-[var(--color-accent-to)]/12 blur-[140px]" />
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-16 -top-16 h-64 w-64 rotate-12 border-4 border-[var(--color-accent-from)]/25" />
+        <div className="absolute -right-20 top-1/3 h-72 w-72 -rotate-12 border-4 border-[var(--color-accent-to)]/20" />
+        <div className="absolute -bottom-24 left-1/3 h-56 w-56 rotate-45 border-4 border-[var(--color-accent-from)]/15" />
       </div>
 
       <div className="mx-auto max-w-2xl">
         <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-lg shadow-violet-900/40">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] border border-[var(--color-border-strong)]">
             <Sparkles className="h-5 w-5 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="font-[var(--font-display)] text-3xl font-bold tracking-tight">
@@ -110,8 +109,7 @@ export function Onboarding() {
               {step === 1 && <StepAudience form={form} update={update} />}
               {step === 2 && <StepContent form={form} update={update} />}
               {step === 3 && <StepCadence form={form} update={update} />}
-              {step === 4 && <StepVoice form={form} update={update} />}
-              {step === 5 && <StepReview form={form} />}
+              {step === 4 && <StepReview form={form} />}
             </motion.div>
           </AnimatePresence>
 
@@ -143,7 +141,7 @@ function StepProgress({ steps, current }: { steps: string[]; current: number }) 
     <div className="flex items-center gap-1.5">
       {steps.map((label, i) => (
         <div key={label} className="flex flex-1 flex-col items-center gap-2">
-          <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/8">
+          <div className="relative h-1 w-full overflow-hidden rounded-full bg-black/8">
             {i <= current && (
               <motion.div
                 layoutId={`bar-${i}`}
@@ -175,7 +173,17 @@ function StepBrand({ form, update }: StepProps) {
     <div className="space-y-5">
       <h2 className="font-[var(--font-display)] text-lg font-bold">What's your brand?</h2>
       <div>
-        <Label>Brand name</Label>
+        <FieldLabelRow
+          label="Brand name"
+          action={
+            <AiImproveButton
+              field="brand_name"
+              text={form.brand_name}
+              context={brandContext(form)}
+              onImproved={(v) => update("brand_name", v)}
+            />
+          }
+        />
         <Input
           autoFocus
           placeholder="e.g. Canvas Digital"
@@ -184,7 +192,17 @@ function StepBrand({ form, update }: StepProps) {
         />
       </div>
       <div>
-        <Label>Niche / topic</Label>
+        <FieldLabelRow
+          label="Niche / topic"
+          action={
+            <AiImproveButton
+              field="niche"
+              text={form.niche}
+              context={brandContext(form)}
+              onImproved={(v) => update("niche", v)}
+            />
+          }
+        />
         <Textarea
           rows={3}
           placeholder="Describe what this account is about in a sentence or two — e.g. sustainable home products for eco-conscious millennials"
@@ -201,7 +219,17 @@ function StepAudience({ form, update }: StepProps) {
     <div className="space-y-5">
       <h2 className="font-[var(--font-display)] text-lg font-bold">Who are you talking to?</h2>
       <div>
-        <Label>Target audience</Label>
+        <FieldLabelRow
+          label="Target audience"
+          action={
+            <AiImproveButton
+              field="audience"
+              text={form.audience}
+              context={brandContext(form)}
+              onImproved={(v) => update("audience", v)}
+            />
+          }
+        />
         <Textarea
           rows={3}
           placeholder="Age range, interests, pain points — e.g. busy professionals aged 25-40 who care about sustainability but don't have time to research it"
@@ -209,8 +237,19 @@ function StepAudience({ form, update }: StepProps) {
           onChange={(e) => update("audience", e.target.value)}
         />
       </div>
+      <TargetCountry form={form} update={update} />
       <div>
-        <Label>Brand voice / tone</Label>
+        <FieldLabelRow
+          label="Brand voice / tone"
+          action={
+            <AiImproveButton
+              field="tone"
+              text={form.tone}
+              context={brandContext(form)}
+              onImproved={(v) => update("tone", v)}
+            />
+          }
+        />
         <Input
           placeholder="e.g. energetic and funny, or calm and authoritative"
           value={form.tone}
@@ -271,7 +310,17 @@ function StepCadence({ form, update }: StepProps) {
         </div>
       </div>
       <div>
-        <Label>Call-to-action style</Label>
+        <FieldLabelRow
+          label="Call-to-action style"
+          action={
+            <AiImproveButton
+              field="cta_style"
+              text={form.cta_style}
+              context={brandContext(form)}
+              onImproved={(v) => update("cta_style", v)}
+            />
+          }
+        />
         <Input
           placeholder="e.g. encourage comments and shares"
           value={form.cta_style}
@@ -279,7 +328,17 @@ function StepCadence({ form, update }: StepProps) {
         />
       </div>
       <div>
-        <Label>Hashtag style</Label>
+        <FieldLabelRow
+          label="Hashtag style"
+          action={
+            <AiImproveButton
+              field="hashtag_style"
+              text={form.hashtag_style}
+              context={brandContext(form)}
+              onImproved={(v) => update("hashtag_style", v)}
+            />
+          }
+        />
         <Input
           placeholder="e.g. 8-12 tags: 2 broad, 5-7 niche, 1-2 branded"
           value={form.hashtag_style}
@@ -290,28 +349,22 @@ function StepCadence({ form, update }: StepProps) {
   )
 }
 
-function StepVoice({ form, update }: StepProps) {
+function TargetCountry({ form, update }: StepProps) {
+  const countries = useCountries()
+  useEffect(() => {
+    if (!form.target_country && countries.length) {
+      const guess = guessCountry(countries)
+      if (guess) update("target_country", guess)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countries.length])
   return (
-    <div className="space-y-5">
-      <h2 className="font-[var(--font-display)] text-lg font-bold">Pick a voiceover</h2>
-      <p className="text-xs text-[var(--color-text-muted)]">Used for every generated video's narration.</p>
-      <div className="grid grid-cols-2 gap-3">
-        {VOICES.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            onClick={() => update("tts_voice", v.id)}
-            className={
-              "rounded-xl border p-3.5 text-left text-sm transition " +
-              (form.tts_voice === v.id
-                ? "border-[var(--color-primary)] bg-violet-500/10 text-[var(--color-text)]"
-                : "border-[var(--color-border)] bg-white/[0.02] text-[var(--color-text-muted)] hover:bg-white/5")
-            }
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
+    <div>
+      <Label>Target country</Label>
+      <CountrySelect value={form.target_country ?? ""} onChange={(c) => update("target_country", c)} />
+      <p className="mt-1.5 text-[11px] text-[var(--color-text-faint)]">
+        Your calendar shows this country's holidays and occasions, and we'll write posts for them automatically.
+      </p>
     </div>
   )
 }
@@ -324,12 +377,12 @@ function StepReview({ form }: { form: BrandProfile }) {
     ["Tone", form.tone],
     ["Pillars", form.content_pillars.join(", ") || "—"],
     ["Cadence", `${form.posting_cadence_per_week}x / week`],
-    ["Voice", form.tts_voice],
+    ["Country", form.target_country || "—"],
   ]
   return (
     <div className="space-y-5">
       <h2 className="font-[var(--font-display)] text-lg font-bold">Review your profile</h2>
-      <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)]">
+      <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-md border border-[var(--color-border)]">
         {rows.map(([label, value]) => (
           <div key={label} className="flex gap-4 px-4 py-3 text-sm">
             <span className="w-28 shrink-0 text-[var(--color-text-faint)]">{label}</span>

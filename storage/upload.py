@@ -28,9 +28,10 @@ def check_connection() -> None:
     _client().head_bucket(Bucket=settings.storage_bucket)
 
 
-def upload_video(local_path: str, key: str | None = None) -> str:
-    """Upload a video file and return its public URL. Instagram's Graph API
-    needs a public URL to fetch the video from when creating a media container."""
+def upload_file(local_path: str, key: str | None = None, content_type: str = "application/octet-stream") -> str:
+    """Upload a file and return its public URL. Instagram's API needs a
+    public URL to fetch video/image content from when creating a media
+    container."""
     key = key or os.path.basename(local_path)
     s3 = _client()
     logger.info("Uploading %s to bucket %s as %s", local_path, settings.storage_bucket, key)
@@ -38,9 +39,14 @@ def upload_video(local_path: str, key: str | None = None) -> str:
         local_path,
         settings.storage_bucket,
         key,
-        ExtraArgs={"ContentType": "video/mp4", "ACL": "public-read"},
+        ExtraArgs={"ContentType": content_type, "ACL": "public-read"},
     )
     base = settings.storage_public_base_url.rstrip("/")
     if not base:
         raise RuntimeError("STORAGE_PUBLIC_BASE_URL is not set; cannot build a public video URL.")
     return f"{base}/{key}"
+
+
+def upload_video(local_path: str, key: str | None = None) -> str:
+    """Convenience wrapper for the AI-generated video path (always mp4)."""
+    return upload_file(local_path, key, content_type="video/mp4")

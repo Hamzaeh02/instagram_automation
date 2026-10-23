@@ -13,20 +13,25 @@ class ActionError(RuntimeError):
     pass
 
 
-def approve_post(session: Session, post_id: int) -> Post:
+def _get_owned_post(session: Session, post_id: int, workspace_id: int) -> Post:
     post = session.get(Post, post_id)
-    if not post:
+    if not post or post.workspace_id != workspace_id:
+        # Same error for "doesn't exist" and "belongs to another workspace" -
+        # never confirm to a caller that another tenant's post id exists.
         raise ActionError(f"Post {post_id} not found")
-    post.status = PostStatus.APPROVED.value
-    session.commit()
-    logger.info("Post %s approved", post_id)
     return post
 
 
-def reject_post_with_reason(session: Session, post_id: int, reason: str) -> Post:
-    post = session.get(Post, post_id)
-    if not post:
-        raise ActionError(f"Post {post_id} not found")
+def approve_post(session: Session, post_id: int, workspace_id: int) -> Post:
+    post = _get_owned_post(session, post_id, workspace_id)
+    post.status = PostStatus.APPROVED.value
+    session.commit()
+    logger.info("Post %s approved (workspace %s)", post_id, workspace_id)
+    return post
+
+
+def reject_post_with_reason(session: Session, post_id: int, workspace_id: int, reason: str) -> Post:
+    post = _get_owned_post(session, post_id, workspace_id)
     post.reject_reason = reason
     post.retry_count += 1
     if post.retry_count > settings.max_auto_retries:
@@ -34,5 +39,5 @@ def reject_post_with_reason(session: Session, post_id: int, reason: str) -> Post
     else:
         post.status = PostStatus.PLANNED.value
     session.commit()
-    logger.info("Post %s rejected with reason (retry %s)", post_id, post.retry_count)
+    logger.info("Post %s rejected with reason (retry %s, workspace %s)", post_id, post.retry_count, workspace_id)
     return post

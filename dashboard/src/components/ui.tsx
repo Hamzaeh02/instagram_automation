@@ -24,13 +24,13 @@ export function Button({
   variant?: "primary" | "ghost" | "danger" | "outline"
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all disabled:opacity-40 disabled:pointer-events-none"
+    "inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-bold transition-all disabled:opacity-40 disabled:pointer-events-none"
   const variants: Record<string, string> = {
-    primary: "btn-primary shadow-lg shadow-violet-900/30",
-    ghost: "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-white/5",
+    primary: "btn-primary",
+    ghost: "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-black/5",
     outline:
-      "border border-[var(--color-border-strong)] text-[var(--color-text)] hover:bg-white/5",
-    danger: "bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/30",
+      "border border-[var(--color-border-strong)] text-[var(--color-text)] hover:bg-black/5",
+    danger: "bg-[var(--color-danger)]/15 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/25 border border-[var(--color-danger)]/40",
   }
   return (
     <button className={clsx(base, variants[variant], className)} {...rest}>
@@ -44,7 +44,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={clsx(
-        "w-full rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-white/[0.05] focus:ring-2 focus:ring-violet-500/20",
+        "w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]",
         props.className,
       )}
     />
@@ -56,7 +56,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       className={clsx(
-        "w-full rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-white/[0.05] focus:ring-2 focus:ring-violet-500/20",
+        "w-full rounded-md border border-[var(--color-border)] bg-black/[0.03] px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] outline-none transition focus:border-[var(--color-primary)] focus:bg-black/[0.05]",
         props.className,
       )}
     />
@@ -68,6 +68,18 @@ export function Label({ children }: { children: ReactNode }) {
     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
       {children}
     </label>
+  )
+}
+
+/** Same as Label, but with room for a trailing action (e.g. an AI-improve button). */
+export function FieldLabelRow({ label, action }: { label: string; action?: ReactNode }) {
+  return (
+    <div className="mb-1.5 flex items-center justify-between gap-2">
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+        {label}
+      </label>
+      {action}
+    </div>
   )
 }
 

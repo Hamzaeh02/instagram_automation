@@ -1,12 +1,16 @@
 import { motion } from "framer-motion"
-import { Lock, Sparkles } from "lucide-react"
+import { Lock, Mail, Sparkles } from "lucide-react"
 import { useState, type FormEvent } from "react"
+import { Link } from "react-router-dom"
 import { ApiError } from "../api/client"
+import { AuthFooter } from "../components/AuthFooter"
 import { Button, Input, Label } from "../components/ui"
+import { Scene3D } from "../components/Scene3D"
 import { useAuth } from "../lib/auth"
 
 export function Login() {
   const { login } = useAuth()
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -16,7 +20,7 @@ export function Login() {
     setError(null)
     setLoading(true)
     try {
-      await login(password)
+      await login(email, password)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong")
     } finally {
@@ -26,33 +30,44 @@ export function Login() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-[var(--color-accent-from)]/20 blur-[120px]" />
-        <div className="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-[var(--color-accent-to)]/15 blur-[120px]" />
-      </div>
+      <Scene3D />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="glass-card w-full max-w-sm p-8"
+        className="glass-card relative w-full max-w-sm p-8"
       >
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] shadow-lg shadow-violet-900/40">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent-from)] to-[var(--color-accent-to)] border border-[var(--color-border-strong)]">
             <Sparkles className="h-6 w-6 text-white" strokeWidth={2.5} />
           </div>
-          <h1 className="font-[var(--font-display)] text-2xl font-bold">Reelmind</h1>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">Sign in to your automation dashboard</p>
+          <h1 className="font-[var(--font-display)] text-2xl font-bold">Welcome back</h1>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">Sign in to Reelmind</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <Label>Email</Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-faint)]" />
+              <Input
+                type="email"
+                autoFocus
+                className="pl-10"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div>
             <Label>Password</Label>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-faint)]" />
               <Input
                 type="password"
-                autoFocus
                 className="pl-10"
                 placeholder="••••••••"
                 value={password}
@@ -62,11 +77,7 @@ export function Login() {
           </div>
 
           {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-sm text-rose-400"
-            >
+            <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-rose-400">
               {error}
             </motion.p>
           )}
@@ -75,6 +86,14 @@ export function Login() {
             {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">
+          New here?{" "}
+          <Link to="/signup" className="font-medium text-[var(--color-primary)] hover:underline">
+            Create an account
+          </Link>
+        </p>
+        <AuthFooter />
       </motion.div>
     </div>
   )
